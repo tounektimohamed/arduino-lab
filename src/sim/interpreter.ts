@@ -24,14 +24,6 @@ export interface ArduinoRuntime {
   noTone(pin: number): void;
   servoAttach(pin: number): void;
   servoWrite(pin: number, angle: number): void;
-  pulseIn(pin: number, value: number, timeout: number): number;
-  delayMicroseconds(us: number): void;
-  lcdInit(): void;
-  lcdBacklight(): void;
-  lcdClear(): void;
-  lcdSetCursor(col: number, row: number): void;
-  lcdPrint(text: string): void;
-  stepperStep(steps: number): void;
   delay(ms: number): Promise<void>;
   millis(): number;
   serialBegin(baud: number): void;
@@ -94,9 +86,6 @@ const TYPE_WORDS = new Set([
   'word',
   'String',
   'Servo',
-  'Stepper',
-  'LiquidCrystal',
-  'LiquidCrystal_I2C',
   'auto',
 ]);
 const MODIFIERS = new Set(['const', 'static', 'volatile']);
@@ -160,12 +149,7 @@ function tokenize(code: string): Token[] {
 
     if (/[0-9]/.test(char)) {
       const start = i;
-      if (char === '0' && (code[i + 1] === 'x' || code[i + 1] === 'X')) {
-        i += 2;
-        while (i < length && /[0-9a-fA-F]/.test(code[i])) i++;
-      } else {
-        while (i < length && /[0-9.]/.test(code[i])) i++;
-      }
+      while (i < length && /[0-9.]/.test(code[i])) i++;
       tokens.push({ type: 'num', value: code.slice(start, i), pos: start });
       continue;
     }
@@ -339,12 +323,7 @@ class Parser {
     const decls: { name: string; init: Expr | null }[] = [];
     do {
       const name = this.expectId();
-      let init: Expr | null = null;
-      if (this.match('=')) {
-        init = this.parseExpression();
-      } else if (this.match('(')) {
-        this.parseArgs();
-      }
+      const init = this.match('=') ? this.parseExpression() : null;
       decls.push({ name, init });
     } while (this.match(','));
     this.expect(';');
@@ -464,7 +443,7 @@ class Parser {
     const token = this.peek();
     if (token.type === 'num') {
       this.next();
-      return { type: 'num', value: Number(token.value) };
+      return { type: 'num', value: Number.parseFloat(token.value) };
     }
     if (token.type === 'str') {
       this.next();
@@ -629,7 +608,7 @@ function binary(op: string, left: Value, right: Value): Value {
 
 function mapRange(value: number, inMin: number, inMax: number, outMin: number, outMax: number): number {
   if (inMax === inMin) return outMin;
-  return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin;
+  return Math.trunc(((value - inMin) * (outMax - outMin)) / (inMax - inMin)) + outMin;
 }
 
 class Executor {
@@ -829,26 +808,6 @@ class Executor {
           case 'detach':
             this.servos.delete(name);
             return 0;
-          case 'init':
-            this.runtime.lcdInit();
-            return 0;
-          case 'backlight':
-            this.runtime.lcdBacklight();
-            return 0;
-          case 'clear':
-            this.runtime.lcdClear();
-            return 0;
-          case 'setCursor':
-            this.runtime.lcdSetCursor(num(0), num(1));
-            return 0;
-          case 'print':
-            this.runtime.lcdPrint(args.map(formatValue).join(''));
-            return 0;
-          case 'setSpeed':
-            return 0;
-          case 'step':
-            this.runtime.stepperStep(num(0));
-            return 0;
         }
       }
       throw new ProgramError('Appel de méthode non supporté.');
@@ -884,14 +843,8 @@ class Executor {
         await this.runtime.delay(Math.max(0, arg(0)));
         return 0;
       case 'delayMicroseconds':
-        this.runtime.delayMicroseconds(Math.max(0, arg(0)));
+        await this.runtime.delay(Math.max(0, arg(0)) / 1000);
         return 0;
-      case 'pulseIn':
-        return this.runtime.pulseIn(
-          arg(0),
-          arg(1),
-          args.length > 2 ? arg(2) : 1000000,
-        );
       case 'millis':
         return this.runtime.millis();
       case 'micros':

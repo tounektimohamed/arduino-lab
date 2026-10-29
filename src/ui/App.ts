@@ -6,6 +6,7 @@ import {
   type ComponentId,
   type LessonId,
 } from '../data/lessons';
+import { getPartInfo } from '../data/parts';
 import { pick, t, ui, type Lang, type UIKey } from '../i18n';
 import { ArduinoScene } from '../scene/ArduinoScene';
 import { AudioEngine } from '../sim/AudioEngine';
@@ -87,6 +88,13 @@ const TEMPLATE = `
 
       <div class="stage-hint" id="stage-hint"></div>
       <div class="stage-legend" id="stage-legend"></div>
+
+      <div class="part-card" id="part-card" hidden>
+        <button class="part-close" id="part-close" type="button" aria-label="Fermer">×</button>
+        <span class="eyebrow" data-i18n="partKicker">Composant</span>
+        <strong id="part-name"></strong>
+        <p id="part-role"></p>
+      </div>
 
       <button class="view-reset" id="reset-view" type="button" title="Recentrer la vue" aria-label="Recentrer la vue">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -206,6 +214,8 @@ export class App {
   private readonly completed = new Set<LessonId>();
   private readonly audio = new AudioEngine();
   private toneFreq = 0;
+  private selectedPart: string | null = null;
+  private sensorKind: 'light' | 'servo' | 'buzzer' | null = null;
   private readonly codes = Object.fromEntries(
     LESSONS.map((lesson) => [lesson.id, lesson.code]),
   ) as Record<LessonId, string>;
@@ -237,6 +247,9 @@ export class App {
   private readonly potSlider: HTMLInputElement;
   private readonly potValue: HTMLOutputElement;
 
+  private readonly partCard: HTMLElement;
+  private readonly partName: HTMLElement;
+  private readonly partRole: HTMLElement;
   private readonly sensorControl: HTMLElement;
   private readonly sensorLabel: HTMLElement;
   private readonly sensorValue: HTMLOutputElement;
@@ -293,6 +306,9 @@ export class App {
     this.potSlider = this.el<HTMLInputElement>('pot-slider');
     this.potValue = this.el<HTMLOutputElement>('pot-value');
 
+    this.partCard = this.el('part-card');
+    this.partName = this.el('part-name');
+    this.partRole = this.el('part-role');
     this.sensorControl = this.el('sensor-control');
     this.sensorLabel = this.el('sensor-label');
     this.sensorValue = this.el<HTMLOutputElement>('sensor-value');
@@ -323,6 +339,8 @@ export class App {
     this.navComponents = this.el<HTMLButtonElement>('nav-components');
 
     this.scene = new ArduinoScene(this.canvasHost, this.sim.board);
+    this.scene.onPartSelect = (key) => this.showPart(key);
+    this.el('part-close').addEventListener('click', () => this.scene.clearSelection());
     this.bind();
     this.applyLanguage();
 
@@ -429,10 +447,7 @@ export class App {
     });
 
     this.sensorSlider.addEventListener('input', () => {
-      const value = Number(this.sensorSlider.value);
-      if (this.activeId === 'light') this.sim.board.setLight(value);
-      if (this.activeId === 'temperature') this.sim.board.setTemperature(value);
-      if (this.activeId === 'ultrasonic') this.sim.board.setDistance(value);
+      this.sim.board.setLight(Number(this.sensorSlider.value));
     });
     this.soundToggle.addEventListener('click', () => {
       const muted = this.audio.toggle();
@@ -473,7 +488,7 @@ export class App {
 
     this.sim.subscribe((running) => {
       this.updateSimState(running);
-      if (!running) this.audio.silence();
+      if (!running) this.sim.board.noTone(8);
     });
     this.sim.board.serial.subscribe(() => this.scheduleSerial());
     this.sim.board.subscribe((event) => {
@@ -483,17 +498,7 @@ export class App {
         this.audio.setTone(event.freq);
       }
       if (event.type === 'light') this.sensorSlider.value = String(event.value);
-      if (event.type === 'temperature') this.sensorSlider.value = String(event.value);
-      if (event.type === 'distance') this.sensorSlider.value = String(event.value);
-      if (
-        event.type === 'tone' ||
-        event.type === 'light' ||
-        event.type === 'servo' ||
-        event.type === 'temperature' ||
-        event.type === 'distance' ||
-        event.type === 'lcd' ||
-        event.type === 'stepper'
-      ) {
+      if (event.type === 'tone' || event.type === 'light' || event.type === 'servo') {
         this.updateSensorUI();
       }
     });
@@ -524,6 +529,7 @@ export class App {
     this.renderComponentsModal();
     this.updateProgress();
     this.renderSerial();
+    this.renderPart();
     this.updateSimState(this.sim.running);
   }
 
@@ -609,37 +615,18 @@ export class App {
       this.stageLegend.append(chip);
     }
 
-    this.potControl.hidden = lesson.id !== 'pot';
+    const has = (name: ComponentId): boolean => lesson.components.includes(name);
+    this.potControl.hidden = !has('pot');
     const sensors = {
       light: ['lightLabel', 'lightHint'],
       servo: ['servoLabel', 'servoHint'],
       buzzer: ['toneLabel', 'toneHint'],
-      temperature: ['temperatureLabel', 'temperatureHint'],
-      ultrasonic: ['distanceLabel', 'distanceHint'],
-      rgb: ['rgbLabel', 'rgbHint'],
-      lcd: ['lcdLabel', 'lcdHint'],
-      stepper: ['stepperLabel', 'stepperHint'],
     } as const;
-    const sensor =
-      lesson.id in sensors ? sensors[lesson.id as keyof typeof sensors] : null;
+    this.sensorKind = has('ldr') ? 'light' : has('servo') ? 'servo' : has('buzzer') ? 'buzzer' : null;
+    const sensor = this.sensorKind ? sensors[this.sensorKind] : null;
     this.sensorControl.hidden = sensor === null;
-    const sliderLessons: LessonId[] = ['light', 'temperature', 'ultrasonic'];
-    const hasSlider = sliderLessons.includes(lesson.id);
-    this.sensorSlider.hidden = !hasSlider;
-    this.soundToggle.hidden = lesson.id !== 'buzzer';
-    if (hasSlider) {
-      const board = this.sim.board;
-      const config =
-        lesson.id === 'temperature'
-          ? { min: '-10', max: '50', step: '0.5', value: board.temperatureValue }
-          : lesson.id === 'ultrasonic'
-            ? { min: '2', max: '200', step: '1', value: board.distanceCm }
-            : { min: '0', max: '1023', step: '1', value: board.lightValue };
-      this.sensorSlider.min = config.min;
-      this.sensorSlider.max = config.max;
-      this.sensorSlider.step = config.step;
-      this.sensorSlider.value = String(config.value);
-    }
+    this.sensorSlider.hidden = this.sensorKind !== 'light';
+    this.soundToggle.hidden = !has('buzzer');
     if (sensor) {
       this.sensorLabel.textContent = t(this.lang, sensor[0]);
       this.sensorHint.textContent = t(this.lang, sensor[1]);
@@ -647,7 +634,7 @@ export class App {
     }
     this.updateCompleteButton();
 
-    if (syncScene) this.scene.setLesson(lesson.id, lesson.highlightPins);
+    if (syncScene) this.scene.setLesson(lesson.highlightPins, lesson.components);
   }
 
   private selectLesson(id: LessonId): void {
@@ -740,24 +727,10 @@ export class App {
 
   private updateSensorUI(): void {
     const board = this.sim.board;
-    if (this.activeId === 'light') this.sensorValue.textContent = String(board.lightValue);
-    else if (this.activeId === 'temperature') {
-      this.sensorValue.textContent = `${board.temperatureValue.toFixed(1)} °C`;
-    } else if (this.activeId === 'ultrasonic') {
-      this.sensorValue.textContent = `${board.distanceCm} cm`;
-    } else if (this.activeId === 'servo') {
-      this.sensorValue.textContent = `${board.servoAngle}°`;
-    } else if (this.activeId === 'buzzer') {
+    if (this.sensorKind === 'light') this.sensorValue.textContent = String(board.lightValue);
+    else if (this.sensorKind === 'servo') this.sensorValue.textContent = `${board.servoAngle}°`;
+    else if (this.sensorKind === 'buzzer') {
       this.sensorValue.textContent = this.toneFreq > 0 ? `${this.toneFreq} Hz` : '—';
-    } else if (this.activeId === 'rgb') {
-      const hex = [9, 10, 11]
-        .map((pin) => Math.round(board.ledBrightness(pin) * 255).toString(16).padStart(2, '0'))
-        .join('');
-      this.sensorValue.textContent = `#${hex}`;
-    } else if (this.activeId === 'lcd') {
-      this.sensorValue.textContent = board.lcdLines[0].trim() || '—';
-    } else if (this.activeId === 'stepper') {
-      this.sensorValue.textContent = `${Math.round(board.stepperAngle)}°`;
     }
   }
 
@@ -826,6 +799,19 @@ export class App {
       card.append(swatch, title, role);
       this.componentGrid.append(card);
     }
+  }
+
+  private showPart(key: string | null): void {
+    this.selectedPart = key;
+    this.renderPart();
+  }
+
+  private renderPart(): void {
+    const info = this.selectedPart ? getPartInfo(this.selectedPart) : null;
+    this.partCard.hidden = info === null;
+    if (!info) return;
+    this.partName.textContent = pick(this.lang, info.name);
+    this.partRole.textContent = pick(this.lang, info.role);
   }
 
   private openModal(): void {

@@ -14,8 +14,8 @@ export const ui = {
   course: { fr: 'Parcours', ar: 'المسار' },
   comingSoon: { fr: 'Bientôt', ar: 'قريبًا' },
   comingSoonText: {
-    fr: 'Écran OLED, capteur de mouvement, relais…',
-    ar: 'شاشة OLED، حسّاس حركة، مرحّل…',
+    fr: 'Afficheur LCD, capteur de distance, moteur pas à pas…',
+    ar: 'شاشة LCD، حسّاس المسافة، المحرّك الخطوي…',
   },
   heroKicker: { fr: 'Arduino Uno · ATmega328P', ar: 'أردوينو أونو · ATmega328P' },
   heroTitle: { fr: 'Apprendre', ar: 'تعلّم' },
@@ -110,31 +110,8 @@ export const ui = {
     ar: 'فعّل الصوت بزرّ مكبّر الصوت أسفل المشهد.',
   },
   soundToggle: { fr: 'Activer / couper le son', ar: 'تشغيل / كتم الصوت' },
-  temperatureLabel: { fr: 'Température mesurée', ar: 'درجة الحرارة المقاسة' },
-  temperatureHint: {
-    fr: 'Déplacez ce curseur pour simuler une pièce plus chaude ou plus froide.',
-    ar: 'حرّك هذا المنزلق لمحاكاة غرفة أكثر حرارة أو برودة.',
-  },
-  distanceLabel: { fr: 'Distance de l’obstacle', ar: 'مسافة العائق' },
-  distanceHint: {
-    fr: 'Déplacez l’obstacle devant le capteur à ultrasons.',
-    ar: 'حرّك العائق أمام حسّاس الموجات فوق الصوتية.',
-  },
-  rgbLabel: { fr: 'Couleur envoyée', ar: 'اللون المُرسَل' },
-  rgbHint: {
-    fr: 'Les trois canaux PWM se mélangent pour former la couleur.',
-    ar: 'تمتزج قنوات PWM الثلاث لتكوين اللون.',
-  },
-  lcdLabel: { fr: 'Écran LCD 16×2', ar: 'شاشة LCD 16×2' },
-  lcdHint: {
-    fr: 'Le texte affiché vient des appels lcd.print().',
-    ar: 'النص المعروض يأتي من استدعاءات lcd.print().',
-  },
-  stepperLabel: { fr: 'Position du moteur', ar: 'موضع المحرّك' },
-  stepperHint: {
-    fr: 'Chaque appel à step() fait avancer le moteur d’un petit angle.',
-    ar: 'كل استدعاء لـ step() يحرّك المحرّك بزاوية صغيرة.',
-  },
+  partKicker: { fr: 'Composant', ar: 'مكوّن' },
+  partHint: { fr: 'Cliquez sur une pièce de la carte', ar: 'انقر على أي قطعة من اللوحة' },
   progress: { fr: 'progression', ar: 'التقدّم' },
   footerNote: {
     fr: 'Un labo d’électronique original, inspiré des bases de l’Arduino.',

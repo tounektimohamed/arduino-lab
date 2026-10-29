@@ -72,14 +72,6 @@ export class Simulator {
       noTone: (pin) => board.noTone(pin),
       servoAttach: () => undefined,
       servoWrite: (pin, angle) => board.servoWrite(pin, angle),
-      pulseIn: (pin, value, timeout) => board.pulseIn(pin, value, timeout),
-      delayMicroseconds: () => undefined,
-      lcdInit: () => board.lcdInit(),
-      lcdBacklight: () => board.lcdBacklightOn(),
-      lcdClear: () => board.lcdClear(),
-      lcdSetCursor: (col, row) => board.lcdSetCursor(col, row),
-      lcdPrint: (text) => board.lcdPrint(text),
-      stepperStep: (steps) => board.stepperStep(steps),
       delay: async (ms) => {
         const end = performance.now() + Math.min(Math.max(ms, 0), 5000);
         while (performance.now() < end) {

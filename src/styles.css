@@ -1382,3 +1382,71 @@ body.is-ar .modal-head h2 {
     inset-inline-end: 53px;
   }
 }
+
+/* ------------------------------------------------ fiche d'une pièce cliquée */
+
+.part-card {
+  position: absolute;
+  top: 18px;
+  inset-inline-end: 18px;
+  width: min(280px, calc(100% - 36px));
+  padding: 14px 40px 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: rgba(255, 250, 241, 0.94);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  animation: part-in 180ms ease;
+}
+
+.part-card[hidden] {
+  display: none;
+}
+
+.part-card strong {
+  display: block;
+  margin: 4px 0 6px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.part-card p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.part-close {
+  position: absolute;
+  top: 8px;
+  inset-inline-end: 8px;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.part-close:hover {
+  background: rgba(36, 31, 25, 0.08);
+}
+
+@keyframes part-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@media (max-width: 900px) {
+  .part-card {
+    top: auto;
+    bottom: 58px;
+    inset-inline-end: 11px;
+  }
+}
