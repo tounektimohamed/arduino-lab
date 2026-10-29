@@ -1,0 +1,112 @@
+export type Lang = 'fr' | 'ar';
+
+export interface Localized {
+  fr: string;
+  ar: string;
+}
+
+export const ui = {
+  brand: { fr: 'Arduino Lab', ar: 'مختبر أردوينو' },
+  brandSub: { fr: 'électronique interactive', ar: 'إلكترونيات تفاعلية' },
+  navLab: { fr: 'Laboratoire', ar: 'المختبر' },
+  navLessons: { fr: 'Leçons', ar: 'الدروس' },
+  navComponents: { fr: 'Composants', ar: 'المكوّنات' },
+  course: { fr: 'Parcours', ar: 'المسار' },
+  comingSoon: { fr: 'Bientôt', ar: 'قريبًا' },
+  comingSoonText: {
+    fr: 'Capteur de lumière, buzzer, servo, moteur pas à pas…',
+    ar: 'حسّاس الضوء، الجرس، المحرّك المؤازر، المحرّك الخطوي…',
+  },
+  heroKicker: { fr: 'Arduino Uno · ATmega328P', ar: 'أردوينو أونو · ATmega328P' },
+  heroTitle: { fr: 'Apprendre', ar: 'تعلّم' },
+  heroAccent: { fr: 'Arduino', ar: 'أردوينو' },
+  heroTagline: { fr: 'Explorer · Comprendre · Construire', ar: 'استكشف · افهم · ابنِ' },
+  hintPan: { fr: 'Glisser pour déplacer', ar: 'اسحب للتحريك' },
+  hintRotate: { fr: 'Q / E pour pivoter', ar: 'Q / E للتدوير' },
+  hintZoom: { fr: 'Molette pour zoomer', ar: 'العجلة للتكبير' },
+  simReady: { fr: 'Simulateur prêt', ar: 'المحاكي جاهز' },
+  simRunning: { fr: 'Simulation en cours', ar: 'المحاكاة قيد التشغيل' },
+  simStopped: { fr: 'Simulateur arrêté', ar: 'المحاكي متوقف' },
+  objectives: { fr: 'Objectifs', ar: 'الأهداف' },
+  wiring: { fr: 'Câblage', ar: 'التوصيلات' },
+  challenge: { fr: 'Défi', ar: 'تحدٍّ' },
+  run: { fr: 'Lancer', ar: 'تشغيل' },
+  stop: { fr: 'Arrêter', ar: 'إيقاف' },
+  resetCode: { fr: 'Réinitialiser le code', ar: 'إعادة تعيين الكود' },
+  resetView: { fr: 'Recentrer la vue', ar: 'إعادة توسيط العرض' },
+  serialTitle: { fr: 'Moniteur série', ar: 'مراقب المنفذ التسلسلي' },
+  serialStopped: { fr: 'Arrêté', ar: 'متوقف' },
+  serialRunning: { fr: 'En cours', ar: 'قيد التشغيل' },
+  clear: { fr: 'Effacer', ar: 'مسح' },
+  serialPlaceholder: {
+    fr: 'La sortie du programme apparaîtra ici.',
+    ar: 'سيظهر ناتج البرنامج هنا.',
+  },
+  uploading: { fr: 'Téléversement du programme…', ar: 'جارٍ تحميل البرنامج…' },
+  started: { fr: 'Programme démarré.', ar: 'بدأ تشغيل البرنامج.' },
+  stopped: { fr: 'Simulation arrêtée.', ar: 'تم إيقاف المحاكاة.' },
+  markComplete: { fr: 'Marquer comme terminé', ar: 'علّم الدرس كمكتمل' },
+  completed: { fr: 'Leçon terminée', ar: 'الدرس مكتمل' },
+  lesson: { fr: 'Leçon', ar: 'الدرس' },
+  beginner: { fr: 'Débutant', ar: 'مبتدئ' },
+  minutes: { fr: 'min', ar: 'دقائق' },
+  componentsTitle: { fr: 'Les composants du labo', ar: 'مكوّنات المختبر' },
+  close: { fr: 'Fermer', ar: 'إغلاق' },
+  componentLed: { fr: 'LED rouge', ar: 'مصباح LED أحمر' },
+  componentResistor: { fr: 'Résistance 220 Ω', ar: 'مقاومة 220 أوم' },
+  componentButton: { fr: 'Bouton poussoir', ar: 'زرّ ضغط' },
+  componentPot: { fr: 'Potentiomètre 10 kΩ', ar: 'مقياس جهد 10 كيلو أوم' },
+  componentWires: { fr: 'Fils de liaison', ar: 'أسلاك التوصيل' },
+  componentLedRole: {
+    fr: 'Transforme un courant en lumière. La patte longue est l’anode (+).',
+    ar: 'يحوّل التيار إلى ضوء. الساق الطويلة هي الأنود (+).',
+  },
+  componentResistorRole: {
+    fr: 'Limite le courant pour protéger la LED et la carte.',
+    ar: 'يحدّ من التيار لحماية المصباح واللوحة.',
+  },
+  componentButtonRole: {
+    fr: 'Ferme ou ouvre un circuit quand on appuie dessus.',
+    ar: 'يغلق الدائرة أو يفتحها عند الضغط عليه.',
+  },
+  componentPotRole: {
+    fr: 'Une résistance réglable : sa position devient une tension.',
+    ar: 'مقاومة قابلة للضبط: يتحوّل موضعها إلى جهد كهربائي.',
+  },
+  componentWiresRole: {
+    fr: 'Relient les composants aux broches de la carte.',
+    ar: 'تربط المكوّنات بمنافذ اللوحة.',
+  },
+  potLabel: { fr: 'Position du potentiomètre', ar: 'موضع مقياس الجهد' },
+  potHint: {
+    fr: 'Faites glisser le bouton du potentiomètre dans la scène.',
+    ar: 'اسحب مقبض مقياس الجهد في المشهد.',
+  },
+  hintButton: {
+    fr: 'Cliquez sur le bouton dans la scène 3D.',
+    ar: 'انقر على الزرّ في المشهد ثلاثي الأبعاد.',
+  },
+  hintLed: {
+    fr: 'Lancez le code pour voir la LED clignoter.',
+    ar: 'شغّل الكود لترى المصباح يومض.',
+  },
+  hintPot: {
+    fr: 'Faites glisser le potentiomètre et lancez le code.',
+    ar: 'اسحب مقياس الجهد ثم شغّل الكود.',
+  },
+  progress: { fr: 'progression', ar: 'التقدّم' },
+  footerNote: {
+    fr: 'Un labo d’électronique original, inspiré des bases de l’Arduino.',
+    ar: 'مختبر إلكترونيات أصلي، مستوحى من أساسيات أردوينو.',
+  },
+} satisfies Record<string, Localized>;
+
+export type UIKey = keyof typeof ui;
+
+export function t(lang: Lang, key: UIKey): string {
+  return ui[key][lang];
+}
+
+export function pick(lang: Lang, value: Localized): string {
+  return value[lang];
+}
