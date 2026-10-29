@@ -20,6 +20,10 @@ export interface ArduinoRuntime {
   digitalRead(pin: number): number;
   analogRead(pin: number): number;
   analogWrite(pin: number, value: number): void;
+  tone(pin: number, freq: number, duration: number): void;
+  noTone(pin: number): void;
+  servoAttach(pin: number): void;
+  servoWrite(pin: number, angle: number): void;
   delay(ms: number): Promise<void>;
   millis(): number;
   serialBegin(baud: number): void;
@@ -81,6 +85,7 @@ const TYPE_WORDS = new Set([
   'signed',
   'word',
   'String',
+  'Servo',
   'auto',
 ]);
 const MODIFIERS = new Set(['const', 'static', 'volatile']);
@@ -95,6 +100,14 @@ const CONSTANTS = new Map<string, Value>([
   ['false', 0],
   ['LED_BUILTIN', 13],
   ['PI', Math.PI],
+  ['NOTE_C4', 262],
+  ['NOTE_D4', 294],
+  ['NOTE_E4', 330],
+  ['NOTE_F4', 349],
+  ['NOTE_G4', 392],
+  ['NOTE_A4', 440],
+  ['NOTE_B4', 494],
+  ['NOTE_C5', 523],
   ['A0', 14],
   ['A1', 15],
   ['A2', 16],
@@ -602,6 +615,7 @@ class Executor {
   private globals = new Scope();
   private ops = 0;
   private callDepth = 0;
+  private servos = new Map<string, number>();
 
   constructor(
     private program: ParsedProgram,
@@ -777,6 +791,25 @@ class Executor {
             throw new ProgramError(`Serial.${member.property}() n'est pas supporté.`);
         }
       }
+      if (member.object.type === 'id') {
+        const name = member.object.name;
+        const num = (index: number): number => toNumber(args[index] ?? 0);
+        switch (member.property) {
+          case 'attach':
+            this.servos.set(name, num(0));
+            this.runtime.servoAttach(num(0));
+            return 0;
+          case 'write': {
+            const pin = this.servos.get(name);
+            if (pin === undefined) throw new ProgramError('Servo : appelez attach() avant write().');
+            this.runtime.servoWrite(pin, Math.min(180, Math.max(0, num(0))));
+            return 0;
+          }
+          case 'detach':
+            this.servos.delete(name);
+            return 0;
+        }
+      }
       throw new ProgramError('Appel de méthode non supporté.');
     }
 
@@ -839,7 +872,16 @@ class Executor {
       case 'sq':
         return arg(0) * arg(0);
       case 'tone':
+        this.runtime.tone(arg(0), arg(1), arg(2));
+        return 0;
       case 'noTone':
+        this.runtime.noTone(arg(0));
+        return 0;
+      case 'random':
+        return args.length > 1
+          ? arg(0) + Math.floor(Math.random() * (arg(1) - arg(0)))
+          : Math.floor(Math.random() * arg(0));
+      case 'randomSeed':
         return 0;
       default:
         throw new ProgramError(`Fonction inconnue : ${name}().`);

@@ -2,11 +2,13 @@ import {
   COMPONENTS,
   LESSONS,
   getLesson,
+  isLessonId,
   type ComponentId,
   type LessonId,
 } from '../data/lessons';
 import { pick, t, ui, type Lang, type UIKey } from '../i18n';
 import { ArduinoScene } from '../scene/ArduinoScene';
+import { AudioEngine } from '../sim/AudioEngine';
 import { Simulator } from '../sim/Simulator';
 
 const TEMPLATE = `
@@ -92,6 +94,8 @@ const TEMPLATE = `
           <path d="M12 2.5v3.4M12 18.1v3.4M2.5 12h3.4M18.1 12h3.4"/>
         </svg>
       </button>
+
+      <button class="view-reset sound-toggle" id="sound-toggle" type="button" data-i18n-title="soundToggle" aria-pressed="false" hidden>🔊</button>
     </section>
 
     <aside class="workbench" id="workbench">
@@ -132,6 +136,15 @@ const TEMPLATE = `
           </div>
           <input id="pot-slider" type="range" min="0" max="1023" value="512" />
           <small data-i18n="potHint">Faites glisser le bouton du potentiomètre dans la scène.</small>
+        </section>
+
+        <section class="pot-control" id="sensor-control" hidden>
+          <div class="pot-control-head">
+            <span id="sensor-label"></span>
+            <output id="sensor-value"></output>
+          </div>
+          <input id="sensor-slider" type="range" min="0" max="1023" value="650" />
+          <small id="sensor-hint"></small>
         </section>
       </div>
 
@@ -191,11 +204,11 @@ export class App {
   private lang: Lang = 'fr';
   private activeId: LessonId = 'blink';
   private readonly completed = new Set<LessonId>();
-  private readonly codes: Record<LessonId, string> = {
-    blink: getLesson('blink').code,
-    button: getLesson('button').code,
-    pot: getLesson('pot').code,
-  };
+  private readonly audio = new AudioEngine();
+  private toneFreq = 0;
+  private readonly codes = Object.fromEntries(
+    LESSONS.map((lesson) => [lesson.id, lesson.code]),
+  ) as Record<LessonId, string>;
 
   private hasRun = false;
   private persistTimer: number | null = null;
@@ -223,6 +236,13 @@ export class App {
   private readonly potControl: HTMLElement;
   private readonly potSlider: HTMLInputElement;
   private readonly potValue: HTMLOutputElement;
+
+  private readonly sensorControl: HTMLElement;
+  private readonly sensorLabel: HTMLElement;
+  private readonly sensorValue: HTMLOutputElement;
+  private readonly sensorSlider: HTMLInputElement;
+  private readonly sensorHint: HTMLElement;
+  private readonly soundToggle: HTMLButtonElement;
 
   private readonly codeEl: HTMLTextAreaElement;
   private readonly runBtn: HTMLButtonElement;
@@ -273,6 +293,13 @@ export class App {
     this.potSlider = this.el<HTMLInputElement>('pot-slider');
     this.potValue = this.el<HTMLOutputElement>('pot-value');
 
+    this.sensorControl = this.el('sensor-control');
+    this.sensorLabel = this.el('sensor-label');
+    this.sensorValue = this.el<HTMLOutputElement>('sensor-value');
+    this.sensorSlider = this.el<HTMLInputElement>('sensor-slider');
+    this.sensorHint = this.el('sensor-hint');
+    this.soundToggle = this.el<HTMLButtonElement>('sound-toggle');
+
     this.codeEl = this.el<HTMLTextAreaElement>('code');
     this.runBtn = this.el<HTMLButtonElement>('run-btn');
     this.runIcon = this.el('run-icon');
@@ -318,16 +345,14 @@ export class App {
       if (storedLang === 'fr' || storedLang === 'ar') this.lang = storedLang;
 
       const storedLesson = localStorage.getItem('arduino-lab:lesson');
-      if (storedLesson === 'blink' || storedLesson === 'button' || storedLesson === 'pot') {
-        this.activeId = storedLesson;
-      }
+      if (isLessonId(storedLesson)) this.activeId = storedLesson;
 
       const progress = localStorage.getItem('arduino-lab:progress');
       if (progress) {
         const parsed: unknown = JSON.parse(progress);
         if (Array.isArray(parsed)) {
           for (const item of parsed) {
-            if (item === 'blink' || item === 'button' || item === 'pot') this.completed.add(item);
+            if (isLessonId(item)) this.completed.add(item);
           }
         }
       }
@@ -403,6 +428,15 @@ export class App {
       if (event.key === 'Escape' && !this.componentsModal.hidden) this.closeModal();
     });
 
+    this.sensorSlider.addEventListener('input', () => {
+      this.sim.board.setLight(Number(this.sensorSlider.value));
+    });
+    this.soundToggle.addEventListener('click', () => {
+      const muted = this.audio.toggle();
+      this.soundToggle.textContent = muted ? '🔇' : '🔊';
+      this.soundToggle.setAttribute('aria-pressed', String(muted));
+    });
+
     this.potSlider.addEventListener('input', () => {
       this.sim.board.setPot(Number(this.potSlider.value));
     });
@@ -411,7 +445,7 @@ export class App {
       const target = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-lesson]');
       if (!target) return;
       const id = target.dataset.lesson;
-      if (id === 'blink' || id === 'button' || id === 'pot') this.selectLesson(id);
+      if (isLessonId(id)) this.selectLesson(id);
     });
 
     this.codeEl.addEventListener('input', () => {
@@ -434,10 +468,21 @@ export class App {
       }
     });
 
-    this.sim.subscribe((running) => this.updateSimState(running));
+    this.sim.subscribe((running) => {
+      this.updateSimState(running);
+      if (!running) this.audio.silence();
+    });
     this.sim.board.serial.subscribe(() => this.scheduleSerial());
     this.sim.board.subscribe((event) => {
       if (event.type === 'pot') this.updatePotUI(event.value);
+      if (event.type === 'tone') {
+        this.toneFreq = event.freq;
+        this.audio.setTone(event.freq);
+      }
+      if (event.type === 'light') this.sensorSlider.value = String(event.value);
+      if (event.type === 'tone' || event.type === 'light' || event.type === 'servo') {
+        this.updateSensorUI();
+      }
     });
   }
 
@@ -552,6 +597,20 @@ export class App {
     }
 
     this.potControl.hidden = lesson.id !== 'pot';
+    const sensors = {
+      light: ['lightLabel', 'lightHint'],
+      servo: ['servoLabel', 'servoHint'],
+      buzzer: ['toneLabel', 'toneHint'],
+    } as const;
+    const sensor = lesson.id === 'light' || lesson.id === 'servo' || lesson.id === 'buzzer' ? sensors[lesson.id] : null;
+    this.sensorControl.hidden = sensor === null;
+    this.sensorSlider.hidden = lesson.id !== 'light';
+    this.soundToggle.hidden = lesson.id !== 'buzzer';
+    if (sensor) {
+      this.sensorLabel.textContent = t(this.lang, sensor[0]);
+      this.sensorHint.textContent = t(this.lang, sensor[1]);
+      this.updateSensorUI();
+    }
     this.updateCompleteButton();
 
     if (syncScene) this.scene.setLesson(lesson.id, lesson.highlightPins);
@@ -645,6 +704,15 @@ export class App {
         : t(this.lang, 'simReady');
   }
 
+  private updateSensorUI(): void {
+    const board = this.sim.board;
+    if (this.activeId === 'light') this.sensorValue.textContent = String(board.lightValue);
+    else if (this.activeId === 'servo') this.sensorValue.textContent = `${board.servoAngle}°`;
+    else if (this.activeId === 'buzzer') {
+      this.sensorValue.textContent = this.toneFreq > 0 ? `${this.toneFreq} Hz` : '—';
+    }
+  }
+
   private updatePotUI(value: number): void {
     this.potSlider.value = String(value);
     this.potValue.textContent = String(value);
@@ -689,7 +757,7 @@ export class App {
   }
 
   private renderComponentsModal(): void {
-    const ids: ComponentId[] = ['led', 'resistor', 'button', 'pot', 'wires'];
+    const ids: ComponentId[] = ['led', 'resistor', 'button', 'pot', 'buzzer', 'ldr', 'servo', 'wires'];
     this.componentGrid.replaceChildren();
 
     for (const id of ids) {

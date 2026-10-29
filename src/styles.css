@@ -1356,3 +1356,29 @@ body.is-ar .modal-head h2 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ------------------------------------------------- capteurs & sons (leçons 4-6) */
+
+.sound-toggle {
+  inset-inline-end: 62px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.sound-toggle[hidden] {
+  display: none;
+}
+
+.sound-toggle:hover {
+  transform: scale(1.08);
+}
+
+.pot-control output {
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 900px) {
+  .sound-toggle {
+    inset-inline-end: 53px;
+  }
+}

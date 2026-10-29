@@ -68,6 +68,10 @@ export class Simulator {
       digitalRead: (pin) => board.digitalRead(pin),
       analogRead: (pin) => board.analogRead(pin),
       analogWrite: (pin, value) => board.analogWrite(pin, value),
+      tone: (pin, freq, duration) => board.tone(pin, freq, duration),
+      noTone: (pin) => board.noTone(pin),
+      servoAttach: () => undefined,
+      servoWrite: (pin, angle) => board.servoWrite(pin, angle),
       delay: async (ms) => {
         const end = performance.now() + Math.min(Math.max(ms, 0), 5000);
         while (performance.now() < end) {

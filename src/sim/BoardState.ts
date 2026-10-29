@@ -66,7 +66,10 @@ export type BoardEvent =
   | { type: 'pin'; pin: number; value: number }
   | { type: 'pwm'; pin: number; value: number }
   | { type: 'button'; pressed: boolean }
-  | { type: 'pot'; value: number };
+  | { type: 'pot'; value: number }
+  | { type: 'tone'; pin: number; freq: number }
+  | { type: 'servo'; pin: number; angle: number }
+  | { type: 'light'; value: number };
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -76,6 +79,9 @@ export class BoardState {
 
   buttonPressed = false;
   potValue = 512;
+  lightValue = 650;
+  servoAngle = 90;
+  private toneTimer: number | null = null;
 
   private modes = new Map<number, PinMode>();
   private outputs = new Map<number, number>();
@@ -92,8 +98,13 @@ export class BoardState {
     this.outputs.clear();
     this.pwmValues.clear();
     this.buttonPressed = false;
+    this.clearToneTimer();
+    this.servoAngle = 90;
     this.emit({ type: 'reset' });
     this.emit({ type: 'pot', value: this.potValue });
+    this.emit({ type: 'light', value: this.lightValue });
+    this.emit({ type: 'servo', pin: 10, angle: 90 });
+    this.emit({ type: 'tone', pin: 8, freq: 0 });
   }
 
   pinMode(pin: number, mode: number): void {
@@ -124,6 +135,7 @@ export class BoardState {
 
   analogRead(pin: number): number {
     if (pin === 0 || pin === 14) return this.potValue;
+    if (pin === 1 || pin === 15) return this.lightValue;
     return 0;
   }
 
@@ -139,6 +151,39 @@ export class BoardState {
     if (this.buttonPressed === pressed) return;
     this.buttonPressed = pressed;
     this.emit({ type: 'button', pressed });
+  }
+
+  tone(pin: number, freq: number, duration: number): void {
+    this.clearToneTimer();
+    this.emit({ type: 'tone', pin, freq: Math.max(0, freq) });
+    if (duration > 0) {
+      this.toneTimer = window.setTimeout(() => {
+        this.toneTimer = null;
+        this.emit({ type: 'tone', pin, freq: 0 });
+      }, duration);
+    }
+  }
+
+  noTone(pin: number): void {
+    this.clearToneTimer();
+    this.emit({ type: 'tone', pin, freq: 0 });
+  }
+
+  servoWrite(pin: number, angle: number): void {
+    this.servoAngle = Math.round(clamp(angle, 0, 180));
+    this.emit({ type: 'servo', pin, angle: this.servoAngle });
+  }
+
+  setLight(value: number): void {
+    const next = Math.round(clamp(value, 0, 1023));
+    if (next === this.lightValue) return;
+    this.lightValue = next;
+    this.emit({ type: 'light', value: next });
+  }
+
+  private clearToneTimer(): void {
+    if (this.toneTimer !== null) window.clearTimeout(this.toneTimer);
+    this.toneTimer = null;
   }
 
   setPot(value: number): void {

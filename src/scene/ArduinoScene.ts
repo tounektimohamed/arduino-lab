@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { BoardEvent, BoardState } from '../sim/BoardState';
 import type { LessonId } from '../data/lessons';
 import {
@@ -80,7 +81,7 @@ function lanePoints(
 
 interface InteractiveItem {
   root: THREE.Object3D;
-  kind: 'button' | 'pot';
+  kind: 'button' | 'pot' | 'lamp';
 }
 
 export class ArduinoScene {
@@ -100,6 +101,27 @@ export class ArduinoScene {
   private readonly buttonWires = new THREE.Group();
   private readonly potGroup = new THREE.Group();
   private readonly potWires = new THREE.Group();
+  private readonly buzzerGroup = new THREE.Group();
+  private readonly buzzerWires = new THREE.Group();
+  private readonly ldrGroup = new THREE.Group();
+  private readonly ldrWires = new THREE.Group();
+  private readonly servoGroup = new THREE.Group();
+  private readonly servoWires = new THREE.Group();
+  private readonly lamp = new THREE.Group();
+  private readonly soundRings: THREE.Mesh[] = [];
+  private readonly dayColor = new THREE.Color('#f2e8d7');
+  private readonly nightColor = new THREE.Color('#2f2c3d');
+  private lampMaterial!: THREE.MeshBasicMaterial;
+  private sunLight!: THREE.PointLight;
+  private servoHorn!: THREE.Group;
+  private servoTarget = 90;
+  private servoCurrent = 90;
+  private toneFreq = 0;
+  private lightLevel = 0.63;
+  private exposure = 1.05;
+  private activeLesson: LessonId = 'blink';
+  private lampStartY = 0;
+  private lampStartValue = 0;
   private readonly unsubscribers: (() => void)[] = [];
   private readonly resizeObserver: ResizeObserver;
 
@@ -115,7 +137,7 @@ export class ArduinoScene {
   private buttonCap!: THREE.Mesh;
   private buttonCapY = 0.2;
   private potKnob!: THREE.Group;
-  private activePointer: 'button' | 'pot' | null = null;
+  private activePointer: 'button' | 'pot' | 'lamp' | null = null;
   private potStartX = 0;
   private potStartValue = 0;
   private disposed = false;
@@ -151,6 +173,7 @@ export class ArduinoScene {
     this.controls.screenSpacePanning = true;
     this.controls.update();
 
+    this.buildEnvironment();
     this.buildLights();
     this.buildDesk();
     this.buildBoard();
@@ -169,6 +192,17 @@ export class ArduinoScene {
   }
 
   setLesson(id: LessonId, pins: string[]): void {
+    this.activeLesson = id;
+    this.buzzerGroup.visible = id === 'buzzer';
+    this.buzzerWires.visible = id === 'buzzer';
+    this.ldrGroup.visible = id === 'light';
+    this.ldrWires.visible = id === 'light';
+    this.servoGroup.visible = id === 'servo';
+    this.servoWires.visible = id === 'servo';
+    const nextTarget = this.viewTarget();
+    this.camera.position.add(nextTarget.clone().sub(this.controls.target));
+    this.controls.target.copy(nextTarget);
+    this.controls.update();
     this.buttonGroup.visible = id === 'button';
     this.buttonWires.visible = id === 'button';
     this.potGroup.visible = id === 'pot';
@@ -186,9 +220,21 @@ export class ArduinoScene {
   }
 
   resetView(): void {
-    this.controls.target.set(0.3, 0.35, 0.25);
-    this.camera.position.set(11.5, 10.5, 13.5);
+    const target = this.viewTarget();
+    this.controls.target.copy(target);
+    this.camera.position.copy(target).add(vec(11.2, 10.15, 13.25));
     this.controls.update();
+  }
+
+  private viewTarget(): THREE.Vector3 {
+    return vec(0.3, 0.35, this.activeLesson === 'servo' ? 1.6 : 0.25);
+  }
+
+  private buildEnvironment(): void {
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.45;
+    pmrem.dispose();
   }
 
   dispose(): void {
@@ -197,6 +243,7 @@ export class ArduinoScene {
     this.resizeObserver.disconnect();
     for (const unsubscribe of this.unsubscribers) unsubscribe();
     this.controls.dispose();
+    this.scene.environment?.dispose();
     this.scene.traverse((object) => {
       const mesh = object as THREE.Mesh;
       if (mesh.isMesh && mesh.geometry) mesh.geometry.dispose();
@@ -488,6 +535,9 @@ export class ArduinoScene {
     this.buildResistor();
     this.buildButton();
     this.buildPot();
+    this.buildBuzzer();
+    this.buildLdr();
+    this.buildServo();
   }
 
   private buildLed(): void {
@@ -678,7 +728,214 @@ export class ArduinoScene {
     this.interactive.push({ root: this.potKnob, kind: 'pot' });
   }
 
+
+  private buildBuzzer(): void {
+    this.buzzerGroup.position.set((holeX(20) + holeX(23)) / 2, BREADBOARD.h, holeZ(3));
+
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.52, 0.52, 0.6, 32),
+      std(0x1f1f23, { roughness: 0.35, metalness: 0.15 }),
+    );
+    body.position.y = 0.4;
+    body.castShadow = true;
+    this.buzzerGroup.add(body);
+
+    const top = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.4, 0.4, 0.02, 32),
+      std(0x2d2d33, { roughness: 0.25 }),
+    );
+    top.position.y = 0.71;
+    this.buzzerGroup.add(top);
+
+    const hole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.07, 0.03, 16),
+      std(0x050505, { roughness: 0.9 }),
+    );
+    hole.position.y = 0.72;
+    this.buzzerGroup.add(hole);
+
+    const plus = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.012, 0.04), std(0xd0453a));
+    plus.position.set(-0.36, 0.72, 0);
+    this.buzzerGroup.add(plus);
+
+    const legMat = std(0xc9c9c9, { metalness: 0.7, roughness: 0.3 });
+    for (const dx of [-0.405, 0.405]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.2, 8), legMat);
+      leg.position.set(dx, 0.1, 0);
+      this.buzzerGroup.add(leg);
+    }
+
+    for (let i = 0; i < 3; i++) {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.45, 0.025, 8, 40),
+        new THREE.MeshBasicMaterial({ color: 0xe2543f, transparent: true, opacity: 0, depthWrite: false }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 1.0;
+      this.buzzerGroup.add(ring);
+      this.soundRings.push(ring);
+    }
+
+    this.buzzerGroup.visible = false;
+    this.scene.add(this.buzzerGroup);
+  }
+
+  private buildLdr(): void {
+    this.ldrGroup.position.set(holeX(21), BREADBOARD.h, holeZ(6));
+
+    const disc = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.36, 0.36, 0.1, 28),
+      std(0xd9b36a, { roughness: 0.4 }),
+    );
+    disc.position.y = 0.3;
+    disc.castShadow = true;
+    this.ldrGroup.add(disc);
+
+    const trackMat = std(0x6b3b1a, { roughness: 0.6 });
+    for (let i = -2; i <= 2; i++) {
+      const track = new THREE.Mesh(new THREE.BoxGeometry(0.5 - Math.abs(i) * 0.06, 0.012, 0.05), trackMat);
+      track.position.set(0, 0.356, i * 0.12);
+      this.ldrGroup.add(track);
+    }
+
+    const legMat = std(0xc9c9c9, { metalness: 0.7, roughness: 0.3 });
+    for (const dx of [-0.27, 0.27]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.3, 8), legMat);
+      leg.position.set(dx, 0.15, 0);
+      this.ldrGroup.add(leg);
+    }
+
+    const res = new THREE.Group();
+    res.position.set((holeX(22) + holeX(25)) / 2 - holeX(21), 0, holeZ(8) - holeZ(6));
+    const resBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.1, 0.62, 16),
+      std(0xd8b98c, { roughness: 0.6 }),
+    );
+    resBody.rotation.z = Math.PI / 2;
+    resBody.position.y = 0.28;
+    res.add(resBody);
+    [-0.16, 0, 0.16].forEach((offset, index) => {
+      const band = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.104, 0.104, 0.035, 16),
+        std([0x7a4a2a, 0x1c1a18, 0xe08a2e][index]),
+      );
+      band.rotation.z = Math.PI / 2;
+      band.position.set(offset, 0.28, 0);
+      res.add(band);
+    });
+    for (const dx of [-0.405, 0.405]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.28, 8), legMat);
+      leg.position.set(dx, 0.14, 0);
+      res.add(leg);
+    }
+    this.ldrGroup.add(res);
+
+    // Le « soleil » : on le fait glisser pour changer la lumière ambiante.
+    this.lampMaterial = new THREE.MeshBasicMaterial({ color: 0xffc94a });
+    const sun = new THREE.Mesh(new THREE.SphereGeometry(0.5, 24, 16), this.lampMaterial);
+    this.lamp.add(sun);
+    for (let i = 0; i < 8; i++) {
+      const ray = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.42), this.lampMaterial);
+      const angle = (i / 8) * Math.PI * 2;
+      ray.position.set(Math.cos(angle) * 0.82, 0, Math.sin(angle) * 0.82);
+      ray.rotation.y = -angle + Math.PI / 2;
+      this.lamp.add(ray);
+    }
+    this.sunLight = new THREE.PointLight(0xfff0c0, 2, 14, 1.4);
+    this.lamp.add(this.sunLight);
+    this.ldrGroup.add(this.lamp);
+    this.interactive.push({ root: this.lamp, kind: 'lamp' });
+
+    this.ldrGroup.visible = false;
+    this.scene.add(this.ldrGroup);
+    this.setLightVisual(this.board.lightValue);
+  }
+
+  private buildServo(): void {
+    this.servoGroup.position.set(-0.6, 0, 5.0);
+    const blue = std(0x2f6bb5, { roughness: 0.45 });
+
+    const body = new THREE.Mesh(new RoundedBoxGeometry(1.5, 1.1, 0.78, 2, 0.05), blue);
+    body.position.y = 0.55;
+    body.castShadow = true;
+    this.servoGroup.add(body);
+
+    const flange = new THREE.Mesh(new RoundedBoxGeometry(2.1, 0.1, 0.74, 1, 0.03), blue);
+    flange.position.y = 0.82;
+    flange.castShadow = true;
+    this.servoGroup.add(flange);
+
+    const bump = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.22, 24), blue);
+    bump.position.set(0.45, 1.2, 0);
+    this.servoGroup.add(bump);
+
+    const plug = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.44), std(0x222225, { roughness: 0.7 }));
+    plug.position.set(-0.9, 0.55, 0);
+    this.servoGroup.add(plug);
+
+    this.servoHorn = new THREE.Group();
+    this.servoHorn.position.set(0.45, 1.36, 0);
+    const white = std(0xf2eee6, { roughness: 0.5 });
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.14, 20), white);
+    this.servoHorn.add(hub);
+    const arm = new THREE.Mesh(new RoundedBoxGeometry(1.05, 0.07, 0.2, 1, 0.03), white);
+    arm.position.x = 0.42;
+    arm.castShadow = true;
+    this.servoHorn.add(arm);
+    const screw = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.16, 10),
+      std(0x333333, { metalness: 0.6 }),
+    );
+    this.servoHorn.add(screw);
+    this.servoGroup.add(this.servoHorn);
+
+    this.servoGroup.visible = false;
+    this.scene.add(this.servoGroup);
+  }
+
+  private buildExtraWires(): void {
+    const v = (p: { x: number; y: number; z: number }): THREE.Vector3 => vec(p.x, p.y, p.z);
+    const p8 = v(pinWorld('8'));
+    const gndBack = v(pinWorld('GND'));
+    const a1 = v(pinWorld('A1'));
+    const v5 = v(pinWorld('5V'));
+    const gndFront = v(POWER_GND);
+    const p10 = v(pinWorld('10'));
+
+    this.buzzerWires.add(
+      wireMesh(lanePoints(p8, vec(holeX(20), 0.95, holeZ(3)), -3.45, 1.3), COLORS.blue),
+      wireMesh(archPoints(gndBack, vec(holeX(23), 0.95, holeZ(3)), 1.2), COLORS.black),
+    );
+    this.buzzerWires.visible = false;
+    this.scene.add(this.buzzerWires);
+
+    this.ldrWires.add(
+      wireMesh(lanePoints(v5, vec(holeX(20), 1.02, holeZ(7)), 3.35, 1.35), COLORS.red),
+      wireMesh(lanePoints(a1, vec(holeX(22), 1.02, holeZ(7)), 3.55, 1.55), 0x8a5ad6),
+      wireMesh(lanePoints(gndFront, vec(holeX(25), 1.02, holeZ(7)), 3.15, 1.15), COLORS.black),
+    );
+    this.ldrWires.visible = false;
+    this.scene.add(this.ldrWires);
+
+    this.servoWires.add(
+      wireMesh(archPoints(p10, vec(-1.6, 0.55, 4.87), 2.4), COLORS.orange),
+      wireMesh(archPoints(v5, vec(-1.6, 0.55, 5.0), 0.9), COLORS.red),
+      wireMesh(archPoints(gndFront, vec(-1.6, 0.55, 5.13), 0.9), 0x6b4226),
+    );
+    this.servoWires.visible = false;
+    this.scene.add(this.servoWires);
+  }
+
+  private setLightVisual(value: number): void {
+    const level = value / 1023;
+    this.lightLevel = level;
+    this.lamp.position.y = 5.2 - level * 3.2 - BREADBOARD.h;
+    this.lampMaterial.color.setHSL(0.12, 0.95, 0.35 + level * 0.3);
+    this.sunLight.intensity = 0.3 + level * 3;
+  }
+
   private buildWires(): void {
+    this.buildExtraWires();
     const p9 = pinWorld('9');
     const gnd = pinWorld('GND');
     const p2 = pinWorld('2');
@@ -730,8 +987,8 @@ export class ArduinoScene {
   }
 
   private buildHighlights(): void {
-    for (const label of ['9', '2', 'A0', '5V', 'GND']) {
-      const pin = pinWorld(label);
+    for (const label of ['9', '2', 'A0', '5V', 'GND', 'GND-F', '8', '10', 'A1']) {
+      const pin = label === 'GND-F' ? POWER_GND : pinWorld(label);
 
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(0.12, 0.022, 8, 24),
@@ -749,7 +1006,7 @@ export class ArduinoScene {
       this.scene.add(ring);
       this.rings.set(label, ring);
 
-      const sprite = labelSprite(label);
+      const sprite = labelSprite(label === 'GND-F' ? 'GND' : label);
       sprite.position.set(pin.x, pin.y + 0.75, pin.z);
       sprite.visible = false;
       this.scene.add(sprite);
@@ -788,6 +1045,11 @@ export class ArduinoScene {
     if (hit.kind === 'button') {
       this.activePointer = 'button';
       this.board.setButton(true);
+    } else if (hit.kind === 'lamp') {
+      this.activePointer = 'lamp';
+      this.lampStartY = event.clientY;
+      this.lampStartValue = this.board.lightValue;
+      this.renderer.domElement.style.cursor = 'ns-resize';
     } else {
       this.activePointer = 'pot';
       this.potStartX = event.clientX;
@@ -802,10 +1064,15 @@ export class ArduinoScene {
       this.board.setPot(this.potStartValue + delta * 3.2);
       return;
     }
+    if (this.activePointer === 'lamp') {
+      this.board.setLight(this.lampStartValue + (event.clientY - this.lampStartY) * 4);
+      return;
+    }
     if (this.activePointer) return;
 
     const hit = this.pick(event);
-    this.renderer.domElement.style.cursor = hit ? (hit.kind === 'pot' ? 'grab' : 'pointer') : 'grab';
+    const cursors = { pot: 'grab', button: 'pointer', lamp: 'ns-resize' } as const;
+    this.renderer.domElement.style.cursor = hit ? cursors[hit.kind] : 'grab';
   };
 
   private onPointerUp = (): void => {
@@ -878,7 +1145,7 @@ export class ArduinoScene {
     this.controls.update();
   }
 
-  private pick(event: PointerEvent): { kind: 'button' | 'pot' } | null {
+  private pick(event: PointerEvent): { kind: InteractiveItem['kind'] } | null {
     const rect = this.renderer.domElement.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return null;
 
@@ -922,6 +1189,7 @@ export class ArduinoScene {
   private onBoardEvent = (event: BoardEvent): void => {
     switch (event.type) {
       case 'reset':
+        this.toneFreq = 0;
         this.ledTarget = 0;
         this.onboardTarget = 0;
         this.setButtonVisual(false);
@@ -936,6 +1204,15 @@ export class ArduinoScene {
         break;
       case 'pot':
         this.setPotVisual(event.value);
+        break;
+      case 'tone':
+        this.toneFreq = event.freq;
+        break;
+      case 'servo':
+        this.servoTarget = event.angle;
+        break;
+      case 'light':
+        this.setLightVisual(event.value);
         break;
     }
   };
@@ -977,6 +1254,30 @@ export class ArduinoScene {
       ring.scale.setScalar(pulse);
       (ring.material as THREE.MeshBasicMaterial).opacity = 0.55 + Math.sin(time * 4) * 0.25;
     }
+
+    const maxStep = 420 * delta;
+    this.servoCurrent += Math.max(-maxStep, Math.min(maxStep, this.servoTarget - this.servoCurrent));
+    this.servoHorn.rotation.y = THREE.MathUtils.degToRad(this.servoCurrent);
+
+    this.soundRings.forEach((ring, index) => {
+      const material = ring.material as THREE.MeshBasicMaterial;
+      if (this.toneFreq <= 0) {
+        material.opacity = 0;
+        return;
+      }
+      const phase = (time * (1.2 + this.toneFreq / 900) + index / 3) % 1;
+      ring.scale.setScalar(1 + phase * 2.2);
+      material.opacity = (1 - phase) * 0.7;
+      material.color.setHSL(Math.min(0.85, this.toneFreq / 1400), 0.65, 0.5);
+    });
+
+    const night = this.activeLesson === 'light';
+    const exposureTarget = night ? 0.4 + this.lightLevel * 0.75 : 1.05;
+    this.exposure += (exposureTarget - this.exposure) * Math.min(1, delta * 6);
+    this.renderer.toneMappingExposure = this.exposure;
+    const sky = this.scene.background as THREE.Color;
+    sky.lerpColors(this.nightColor, this.dayColor, night ? this.lightLevel : 1);
+    (this.scene.fog as THREE.Fog).color.copy(sky);
 
     this.renderer.render(this.scene, this.camera);
   }

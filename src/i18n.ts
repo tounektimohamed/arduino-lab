@@ -14,8 +14,8 @@ export const ui = {
   course: { fr: 'Parcours', ar: 'المسار' },
   comingSoon: { fr: 'Bientôt', ar: 'قريبًا' },
   comingSoonText: {
-    fr: 'Capteur de lumière, buzzer, servo, moteur pas à pas…',
-    ar: 'حسّاس الضوء، الجرس، المحرّك المؤازر، المحرّك الخطوي…',
+    fr: 'Afficheur LCD, capteur de distance, moteur pas à pas…',
+    ar: 'شاشة LCD، حسّاس المسافة، المحرّك الخطوي…',
   },
   heroKicker: { fr: 'Arduino Uno · ATmega328P', ar: 'أردوينو أونو · ATmega328P' },
   heroTitle: { fr: 'Apprendre', ar: 'تعلّم' },
@@ -94,6 +94,22 @@ export const ui = {
     fr: 'Faites glisser le potentiomètre et lancez le code.',
     ar: 'اسحب مقياس الجهد ثم شغّل الكود.',
   },
+  lightLabel: { fr: 'Lumière ambiante', ar: 'الإضاءة المحيطة' },
+  lightHint: {
+    fr: 'Faites glisser le soleil dans la scène, ou ce curseur.',
+    ar: 'اسحب الشمس في المشهد أو هذا المنزلق.',
+  },
+  servoLabel: { fr: 'Angle du servomoteur', ar: 'زاوية المحرّك المؤازر' },
+  servoHint: {
+    fr: 'Le bras suit la valeur envoyée par write().',
+    ar: 'يتبع الذراع القيمة المرسلة بـ write().',
+  },
+  toneLabel: { fr: 'Fréquence jouée', ar: 'التردد المُشغَّل' },
+  toneHint: {
+    fr: 'Activez le son avec le haut-parleur, en bas de la scène.',
+    ar: 'فعّل الصوت بزرّ مكبّر الصوت أسفل المشهد.',
+  },
+  soundToggle: { fr: 'Activer / couper le son', ar: 'تشغيل / كتم الصوت' },
   progress: { fr: 'progression', ar: 'التقدّم' },
   footerNote: {
     fr: 'Un labo d’électronique original, inspiré des bases de l’Arduino.',
