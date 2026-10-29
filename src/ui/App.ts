@@ -429,7 +429,10 @@ export class App {
     });
 
     this.sensorSlider.addEventListener('input', () => {
-      this.sim.board.setLight(Number(this.sensorSlider.value));
+      const value = Number(this.sensorSlider.value);
+      if (this.activeId === 'light') this.sim.board.setLight(value);
+      if (this.activeId === 'temperature') this.sim.board.setTemperature(value);
+      if (this.activeId === 'ultrasonic') this.sim.board.setDistance(value);
     });
     this.soundToggle.addEventListener('click', () => {
       const muted = this.audio.toggle();
@@ -480,7 +483,17 @@ export class App {
         this.audio.setTone(event.freq);
       }
       if (event.type === 'light') this.sensorSlider.value = String(event.value);
-      if (event.type === 'tone' || event.type === 'light' || event.type === 'servo') {
+      if (event.type === 'temperature') this.sensorSlider.value = String(event.value);
+      if (event.type === 'distance') this.sensorSlider.value = String(event.value);
+      if (
+        event.type === 'tone' ||
+        event.type === 'light' ||
+        event.type === 'servo' ||
+        event.type === 'temperature' ||
+        event.type === 'distance' ||
+        event.type === 'lcd' ||
+        event.type === 'stepper'
+      ) {
         this.updateSensorUI();
       }
     });
@@ -601,11 +614,32 @@ export class App {
       light: ['lightLabel', 'lightHint'],
       servo: ['servoLabel', 'servoHint'],
       buzzer: ['toneLabel', 'toneHint'],
+      temperature: ['temperatureLabel', 'temperatureHint'],
+      ultrasonic: ['distanceLabel', 'distanceHint'],
+      rgb: ['rgbLabel', 'rgbHint'],
+      lcd: ['lcdLabel', 'lcdHint'],
+      stepper: ['stepperLabel', 'stepperHint'],
     } as const;
-    const sensor = lesson.id === 'light' || lesson.id === 'servo' || lesson.id === 'buzzer' ? sensors[lesson.id] : null;
+    const sensor =
+      lesson.id in sensors ? sensors[lesson.id as keyof typeof sensors] : null;
     this.sensorControl.hidden = sensor === null;
-    this.sensorSlider.hidden = lesson.id !== 'light';
+    const sliderLessons: LessonId[] = ['light', 'temperature', 'ultrasonic'];
+    const hasSlider = sliderLessons.includes(lesson.id);
+    this.sensorSlider.hidden = !hasSlider;
     this.soundToggle.hidden = lesson.id !== 'buzzer';
+    if (hasSlider) {
+      const board = this.sim.board;
+      const config =
+        lesson.id === 'temperature'
+          ? { min: '-10', max: '50', step: '0.5', value: board.temperatureValue }
+          : lesson.id === 'ultrasonic'
+            ? { min: '2', max: '200', step: '1', value: board.distanceCm }
+            : { min: '0', max: '1023', step: '1', value: board.lightValue };
+      this.sensorSlider.min = config.min;
+      this.sensorSlider.max = config.max;
+      this.sensorSlider.step = config.step;
+      this.sensorSlider.value = String(config.value);
+    }
     if (sensor) {
       this.sensorLabel.textContent = t(this.lang, sensor[0]);
       this.sensorHint.textContent = t(this.lang, sensor[1]);
@@ -707,9 +741,23 @@ export class App {
   private updateSensorUI(): void {
     const board = this.sim.board;
     if (this.activeId === 'light') this.sensorValue.textContent = String(board.lightValue);
-    else if (this.activeId === 'servo') this.sensorValue.textContent = `${board.servoAngle}°`;
-    else if (this.activeId === 'buzzer') {
+    else if (this.activeId === 'temperature') {
+      this.sensorValue.textContent = `${board.temperatureValue.toFixed(1)} °C`;
+    } else if (this.activeId === 'ultrasonic') {
+      this.sensorValue.textContent = `${board.distanceCm} cm`;
+    } else if (this.activeId === 'servo') {
+      this.sensorValue.textContent = `${board.servoAngle}°`;
+    } else if (this.activeId === 'buzzer') {
       this.sensorValue.textContent = this.toneFreq > 0 ? `${this.toneFreq} Hz` : '—';
+    } else if (this.activeId === 'rgb') {
+      const hex = [9, 10, 11]
+        .map((pin) => Math.round(board.ledBrightness(pin) * 255).toString(16).padStart(2, '0'))
+        .join('');
+      this.sensorValue.textContent = `#${hex}`;
+    } else if (this.activeId === 'lcd') {
+      this.sensorValue.textContent = board.lcdLines[0].trim() || '—';
+    } else if (this.activeId === 'stepper') {
+      this.sensorValue.textContent = `${Math.round(board.stepperAngle)}°`;
     }
   }
 

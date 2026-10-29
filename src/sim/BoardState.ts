@@ -69,7 +69,11 @@ export type BoardEvent =
   | { type: 'pot'; value: number }
   | { type: 'tone'; pin: number; freq: number }
   | { type: 'servo'; pin: number; angle: number }
-  | { type: 'light'; value: number };
+  | { type: 'light'; value: number }
+  | { type: 'temperature'; value: number }
+  | { type: 'distance'; value: number }
+  | { type: 'stepper'; angle: number }
+  | { type: 'lcd'; lines: [string, string]; backlight: boolean };
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -81,6 +85,12 @@ export class BoardState {
   potValue = 512;
   lightValue = 650;
   servoAngle = 90;
+  temperatureValue = 22;
+  distanceCm = 40;
+  stepperAngle = 0;
+  lcdLines: [string, string] = ['', ''];
+  lcdBacklight = true;
+  private lcdCursor = { col: 0, row: 0 };
   private toneTimer: number | null = null;
 
   private modes = new Map<number, PinMode>();
@@ -100,11 +110,19 @@ export class BoardState {
     this.buttonPressed = false;
     this.clearToneTimer();
     this.servoAngle = 90;
+    this.stepperAngle = 0;
+    this.lcdLines = ['', ''];
+    this.lcdBacklight = true;
+    this.lcdCursor = { col: 0, row: 0 };
     this.emit({ type: 'reset' });
     this.emit({ type: 'pot', value: this.potValue });
     this.emit({ type: 'light', value: this.lightValue });
     this.emit({ type: 'servo', pin: 10, angle: 90 });
     this.emit({ type: 'tone', pin: 8, freq: 0 });
+    this.emit({ type: 'temperature', value: this.temperatureValue });
+    this.emit({ type: 'distance', value: this.distanceCm });
+    this.emit({ type: 'stepper', angle: 0 });
+    this.emitLcd();
   }
 
   pinMode(pin: number, mode: number): void {
@@ -136,7 +154,17 @@ export class BoardState {
   analogRead(pin: number): number {
     if (pin === 0 || pin === 14) return this.potValue;
     if (pin === 1 || pin === 15) return this.lightValue;
+    if (pin === 2 || pin === 16) {
+      const voltage = 0.5 + this.temperatureValue * 0.01;
+      return Math.round(clamp(voltage / 5, 0, 1) * 1023);
+    }
     return 0;
+  }
+
+  pulseIn(pin: number, _value: number, timeout = 1000000): number {
+    if (pin !== 6) return 0;
+    const duration = (this.distanceCm * 2) / 0.034;
+    return Math.min(Math.round(duration), timeout);
   }
 
   ledBrightness(pin: number): number {
@@ -179,6 +207,74 @@ export class BoardState {
     if (next === this.lightValue) return;
     this.lightValue = next;
     this.emit({ type: 'light', value: next });
+  }
+
+  setTemperature(value: number): void {
+    const next = Math.round(clamp(value, -10, 50) * 10) / 10;
+    if (next === this.temperatureValue) return;
+    this.temperatureValue = next;
+    this.emit({ type: 'temperature', value: next });
+  }
+
+  setDistance(value: number): void {
+    const next = Math.round(clamp(value, 2, 200));
+    if (next === this.distanceCm) return;
+    this.distanceCm = next;
+    this.emit({ type: 'distance', value: next });
+  }
+
+  stepperStep(steps: number): void {
+    const delta = (steps / 2048) * 360;
+    this.stepperAngle = ((this.stepperAngle + delta) % 360 + 360) % 360;
+    this.emit({ type: 'stepper', angle: this.stepperAngle });
+  }
+
+  lcdInit(): void {
+    this.lcdLines = ['', ''];
+    this.lcdCursor = { col: 0, row: 0 };
+    this.lcdBacklight = true;
+    this.emitLcd();
+  }
+
+  lcdBacklightOn(): void {
+    this.lcdBacklight = true;
+    this.emitLcd();
+  }
+
+  lcdClear(): void {
+    this.lcdLines = ['', ''];
+    this.lcdCursor = { col: 0, row: 0 };
+    this.emitLcd();
+  }
+
+  lcdSetCursor(col: number, row: number): void {
+    this.lcdCursor = {
+      col: Math.round(clamp(col, 0, 15)),
+      row: Math.round(clamp(row, 0, 1)),
+    };
+  }
+
+  lcdPrint(text: string): void {
+    let { col, row } = this.lcdCursor;
+    for (const char of text) {
+      if (col >= 16) {
+        col = 0;
+        row = (row + 1) % 2;
+      }
+      const line = (this.lcdLines[row] ?? '').padEnd(16, ' ').slice(0, 16);
+      this.lcdLines[row] = `${line.slice(0, col)}${char}${line.slice(col + 1)}`;
+      col++;
+    }
+    this.lcdCursor = { col, row };
+    this.emitLcd();
+  }
+
+  private emitLcd(): void {
+    this.emit({
+      type: 'lcd',
+      lines: [this.lcdLines[0], this.lcdLines[1]],
+      backlight: this.lcdBacklight,
+    });
   }
 
   private clearToneTimer(): void {

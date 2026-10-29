@@ -1,7 +1,32 @@
 import type { Localized } from '../i18n';
 
-export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo';
-export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo';
+export type LessonId =
+  | 'blink'
+  | 'button'
+  | 'pot'
+  | 'traffic'
+  | 'buzzer'
+  | 'light'
+  | 'temperature'
+  | 'ultrasonic'
+  | 'rgb'
+  | 'servo'
+  | 'lcd'
+  | 'stepper';
+export type ComponentId =
+  | 'led'
+  | 'resistor'
+  | 'button'
+  | 'pot'
+  | 'wires'
+  | 'buzzer'
+  | 'ldr'
+  | 'servo'
+  | 'rgb'
+  | 'temperature'
+  | 'ultrasonic'
+  | 'lcd'
+  | 'stepper';
 
 export interface ComponentInfo {
   name: Localized;
@@ -73,6 +98,46 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'يدور إلى زاوية دقيقة من 0° إلى 180° حسب الأمر.',
     },
     color: '#3b6fb6',
+  },
+  rgb: {
+    name: { fr: 'LED RGB', ar: 'مصباح LED ثلاثي الألوان' },
+    role: {
+      fr: 'Trois LED (rouge, vert, bleu) dans un seul boîtier : le mélange des trois donne toutes les couleurs.',
+      ar: 'ثلاثة مصابيح (أحمر، أخضر، أزرق) في غلاف واحد: مزجها يعطي كل الألوان.',
+    },
+    color: '#b34fd4',
+  },
+  temperature: {
+    name: { fr: 'Capteur TMP36', ar: 'حسّاس الحرارة TMP36' },
+    role: {
+      fr: 'Délivre une tension proportionnelle à la température : 10 mV par degré Celsius.',
+      ar: 'يُخرج جهدًا يتناسب مع درجة الحرارة: 10 ميلي فولت لكل درجة مئوية.',
+    },
+    color: '#e07b39',
+  },
+  ultrasonic: {
+    name: { fr: 'Capteur HC-SR04', ar: 'حسّاس المسافة HC-SR04' },
+    role: {
+      fr: 'Émet un ultrason et mesure le temps de retour pour calculer une distance.',
+      ar: 'يُصدر موجة فوق صوتية ويقيس زمن عودتها لحساب المسافة.',
+    },
+    color: '#4b8fd6',
+  },
+  lcd: {
+    name: { fr: 'Afficheur LCD I2C 16×2', ar: 'شاشة LCD I2C 16×2' },
+    role: {
+      fr: 'Affiche deux lignes de seize caractères avec seulement quatre fils.',
+      ar: 'تعرض سطرين من ستة عشر حرفًا بأربعة أسلاك فقط.',
+    },
+    color: '#1f6f8b',
+  },
+  stepper: {
+    name: { fr: 'Moteur pas à pas 28BYJ-48', ar: 'محرّك خطوي 28BYJ-48' },
+    role: {
+      fr: 'Tourne par petits pas précis, piloté par le driver ULN2003.',
+      ar: 'يدور بخطوات صغيرة دقيقة عبر مشغّل ULN2003.',
+    },
+    color: '#2f6bb5',
   },
 };
 
@@ -445,6 +510,462 @@ void loop() {
     code: `// Leçon 6 — piloter un servomoteur\n#include <Servo.h>\n\nServo bras;\n\nvoid setup() {\n  bras.attach(10);\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  for (int angle = 0; angle <= 180; angle += 10) {\n    bras.write(angle);\n    Serial.println(angle);\n    delay(120);\n  }\n  for (int angle = 180; angle >= 0; angle -= 10) {\n    bras.write(angle);\n    Serial.println(angle);\n    delay(120);\n  }\n}\n`,
     components: ['servo', 'wires'],
     highlightPins: ['10', '5V', 'GND-F'],
+  },
+  {
+    id: 'traffic',
+    title: { fr: 'Feu de circulation', ar: 'إشارة المرور' },
+    tagline: {
+      fr: 'Trois LED et une séquence : rouge, orange, vert.',
+      ar: 'ثلاثة مصابيح وتسلسل: أحمر، برتقالي، أخضر.',
+    },
+    duration: 10,
+    level: { fr: 'Débutant', ar: 'مبتدئ' },
+    description: {
+      fr: 'Un feu de circulation, c’est trois sorties qui s’allument dans un ordre précis. Vous pilotez trois LED sur les broches 9, 10 et 11. Une petite fonction allumer() évite de répéter trois digitalWrite() à chaque étape et rend la séquence lisible.',
+      ar: 'إشارة المرور هي ثلاثة مخارج تضيء بترتيب محدد. ستتحكم في ثلاثة مصابيح على المنافذ 9 و10 و11. دالة صغيرة allumer() تجنّب تكرار ثلاث تعليمات digitalWrite() في كل مرحلة وتجعل التسلسل واضحًا.',
+    },
+    objectives: {
+      fr: [
+        'Piloter trois sorties numériques indépendantes.',
+        'Construire une séquence avec delay().',
+        'Factoriser une action répétée dans une fonction.',
+      ],
+      ar: [
+        'التحكم في ثلاثة مخارج رقمية مستقلة.',
+        'بناء تسلسل باستخدام delay().',
+        'تجميع عمل متكرر داخل دالة.',
+      ],
+    },
+    wiring: {
+      fr: [
+        'Broche 9 → résistance 220 Ω → anode de la LED rouge.',
+        'Broche 10 → résistance 220 Ω → anode de la LED orange.',
+        'Broche 11 → résistance 220 Ω → anode de la LED verte.',
+        'Les trois cathodes → GND.',
+      ],
+      ar: [
+        'المنفذ 9 ← مقاومة 220 أوم ← أنود المصباح الأحمر.',
+        'المنفذ 10 ← مقاومة 220 أوم ← أنود المصباح البرتقالي.',
+        'المنفذ 11 ← مقاومة 220 أوم ← أنود المصباح الأخضر.',
+        'الكاثودات الثلاثة ← GND.',
+      ],
+    },
+    challenge: {
+      fr: 'Ajoutez un clignotement vert rapide avant de repasser à l’orange, comme un passage piéton.',
+      ar: 'أضف وميضًا أخضر سريعًا قبل العودة إلى البرتقالي، مثل ممر المشاة.',
+    },
+    hint: {
+      fr: 'Lancez le code : le feu passe du rouge au vert.',
+      ar: 'شغّل الكود: تنتقل الإشارة من الأحمر إلى الأخضر.',
+    },
+    code: `// Leçon 7 — feu de circulation
+
+const int ROUGE = 9;
+const int ORANGE = 10;
+const int VERT = 11;
+
+void setup() {
+  pinMode(ROUGE, OUTPUT);
+  pinMode(ORANGE, OUTPUT);
+  pinMode(VERT, OUTPUT);
+}
+
+void allumer(int led) {
+  digitalWrite(ROUGE, led == ROUGE);
+  digitalWrite(ORANGE, led == ORANGE);
+  digitalWrite(VERT, led == VERT);
+}
+
+void loop() {
+  allumer(ROUGE);
+  delay(1500);
+  allumer(ORANGE);
+  delay(500);
+  allumer(VERT);
+  delay(1500);
+  allumer(ORANGE);
+  delay(500);
+}
+`,
+    components: ['led', 'resistor', 'wires'],
+    highlightPins: ['9', '10', '11', 'GND'],
+  },
+  {
+    id: 'temperature',
+    title: { fr: 'Mesurer la température', ar: 'قياس درجة الحرارة' },
+    tagline: {
+      fr: 'Un capteur TMP36 sur A2, de la tension à la température.',
+      ar: 'حسّاس TMP36 على A2، من الجهد إلى درجة الحرارة.',
+    },
+    duration: 12,
+    level: { fr: 'Intermédiaire', ar: 'متوسط' },
+    description: {
+      fr: 'Le TMP36 délivre une tension qui augmente de 10 mV par degré Celsius, avec un décalage de 0,5 V à 0 °C. La carte lit cette tension avec analogRead() sur A2, puis le programme la reconvertit en degrés. C’est le premier capteur analogique de ce parcours.',
+      ar: 'يُخرج TMP36 جهدًا يزيد بمقدار 10 ميلي فولت لكل درجة مئوية، مع انحراف 0.5 فولت عند 0 °C. تقرأ اللوحة هذا الجهد بـ analogRead() على A2، ثم يعيد البرنامج تحويله إلى درجات. هذا أول حسّاس تماثلي في المسار.',
+    },
+    objectives: {
+      fr: [
+        'Lire une tension analogique sur A2.',
+        'Convertir une valeur brute en tension puis en température.',
+        'Afficher une mesure décimale dans le moniteur série.',
+      ],
+      ar: [
+        'قراءة جهد تماثلي على A2.',
+        'تحويل قيمة خام إلى جهد ثم إلى درجة حرارة.',
+        'عرض قياس عشري في مراقب المنفذ التسلسلي.',
+      ],
+    },
+    wiring: {
+      fr: [
+        '5V → patte gauche du TMP36 (face plate vers vous).',
+        'A2 → patte du milieu (sortie du capteur).',
+        'GND → patte droite.',
+      ],
+      ar: [
+        '5V ← الساق اليسرى لـ TMP36 (الوجه المستوي نحوك).',
+        'A2 ← الساق الوسطى (خرج الحسّاس).',
+        'GND ← الساق اليمنى.',
+      ],
+    },
+    challenge: {
+      fr: 'Affichez aussi la température en Fahrenheit : °F = °C × 1,8 + 32.',
+      ar: 'اعرض أيضًا درجة الحرارة بالفهرنهايت: °F = °C × 1.8 + 32.',
+    },
+    hint: {
+      fr: 'Déplacez le curseur de température et lancez le code.',
+      ar: 'حرّك منزلق درجة الحرارة ثم شغّل الكود.',
+    },
+    code: `// Leçon 8 — mesurer la température
+
+const int CAPTEUR = A2;
+
+void setup() {
+  Serial.begin(9600);
+}
+
+void loop() {
+  int lecture = analogRead(CAPTEUR);
+  float tension = lecture * 5.0 / 1023.0;
+  float temperature = (tension - 0.5) * 100.0;
+
+  Serial.print("Temperature : ");
+  Serial.print(temperature);
+  Serial.println(" C");
+
+  delay(500);
+}
+`,
+    components: ['temperature', 'wires'],
+    highlightPins: ['A2', '5V', 'GND-F'],
+  },
+  {
+    id: 'ultrasonic',
+    title: { fr: 'Mesurer une distance', ar: 'قياس المسافة' },
+    tagline: {
+      fr: 'Le capteur HC-SR04 envoie un ultrason et écoute son écho.',
+      ar: 'حسّاس HC-SR04 يُصدر موجة فوق صوتية ويستمع إلى صدىها.',
+    },
+    duration: 14,
+    level: { fr: 'Intermédiaire', ar: 'متوسط' },
+    description: {
+      fr: 'Le HC-SR04 émet une salve d’ultrasons sur TRIG, puis mesure la durée du retour sur ECHO avec pulseIn(). Le son parcourt 0,034 cm par microseconde : la distance vaut donc durée × 0,034 / 2, car l’onde fait l’aller-retour.',
+      ar: 'يُصدر HC-SR04 دفعة موجات فوق صوتية على TRIG، ثم يقيس مدة العودة على ECHO باستخدام pulseIn(). تقطع الموجة 0.034 سم في كل ميكروثانية: إذن المسافة تساوي المدة × 0.034 / 2 لأن الموجة تذهب وتعود.',
+    },
+    objectives: {
+      fr: [
+        'Déclencher une mesure avec TRIG et ECHO.',
+        'Mesurer une durée avec pulseIn().',
+        'Convertir un temps en distance.',
+      ],
+      ar: [
+        'بدء قياس باستخدام TRIG وECHO.',
+        'قياس مدة باستخدام pulseIn().',
+        'تحويل الزمن إلى مسافة.',
+      ],
+    },
+    wiring: {
+      fr: [
+        'VCC du capteur → 5V.',
+        'GND du capteur → GND.',
+        'TRIG → broche 7.',
+        'ECHO → broche 6.',
+      ],
+      ar: [
+        'VCC للحسّاس ← 5V.',
+        'GND للحسّاس ← GND.',
+        'TRIG ← المنفذ 7.',
+        'ECHO ← المنفذ 6.',
+      ],
+    },
+    challenge: {
+      fr: 'Allumez la LED si un obstacle est à moins de 15 cm.',
+      ar: 'أضئ المصباح إذا كان العائق على بعد أقل من 15 سم.',
+    },
+    hint: {
+      fr: 'Déplacez l’obstacle avec le curseur de distance.',
+      ar: 'حرّك العائق باستخدام منزلق المسافة.',
+    },
+    code: `// Leçon 9 — mesurer une distance
+
+const int TRIG = 7;
+const int ECHO = 6;
+
+void setup() {
+  pinMode(TRIG, OUTPUT);
+  pinMode(ECHO, INPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  digitalWrite(TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG, LOW);
+
+  long duree = pulseIn(ECHO, HIGH);
+  float distance = duree * 0.034 / 2.0;
+
+  Serial.print("Distance : ");
+  Serial.print(distance);
+  Serial.println(" cm");
+
+  delay(300);
+}
+`,
+    components: ['ultrasonic', 'wires'],
+    highlightPins: ['7', '6', '5V', 'GND-F'],
+  },
+  {
+    id: 'rgb',
+    title: { fr: 'Mélanger les couleurs', ar: 'مزج الألوان' },
+    tagline: {
+      fr: 'Une LED RGB et trois sorties PWM pour créer toutes les couleurs.',
+      ar: 'مصباح RGB وثلاثة مخارج PWM لإنشاء كل الألوان.',
+    },
+    duration: 12,
+    level: { fr: 'Intermédiaire', ar: 'متوسط' },
+    description: {
+      fr: 'Une LED RGB contient trois LED : rouge, verte et bleue. En modulant leur intensité avec analogWrite() sur les broches 9, 10 et 11, on mélange la lumière. Rouge + vert donne jaune, vert + bleu donne cyan, et les trois à fond donnent blanc.',
+      ar: 'يحتوي مصباح RGB على ثلاثة مصابيح: أحمر وأخضر وأزرق. بتغيير شدتها باستخدام analogWrite() على المنافذ 9 و10 و11 نمزج الضوء. الأحمر + الأخضر يعطي الأصفر، والأخضر + الأزرق يعطي السماوي، والثلاثة معًا تعطي الأبيض.',
+    },
+    objectives: {
+      fr: [
+        'Comprendre une LED à cathode commune.',
+        'Utiliser analogWrite() pour régler chaque canal.',
+        'Créer une couleur avec une fonction à trois paramètres.',
+      ],
+      ar: [
+        'فهم مصباح LED بكاثود مشترك.',
+        'استخدام analogWrite() لضبط كل قناة.',
+        'إنشاء لون بدالة ذات ثلاثة معاملات.',
+      ],
+    },
+    wiring: {
+      fr: [
+        'Broche 9 → résistance 220 Ω → patte rouge.',
+        'Broche 10 → résistance 220 Ω → patte verte.',
+        'Broche 11 → résistance 220 Ω → patte bleue.',
+        'Cathode commune → GND.',
+      ],
+      ar: [
+        'المنفذ 9 ← مقاومة 220 أوم ← الساق الحمراء.',
+        'المنفذ 10 ← مقاومة 220 أوم ← الساق الخضراء.',
+        'المنفذ 11 ← مقاومة 220 أوم ← الساق الزرقاء.',
+        'الكاثود المشترك ← GND.',
+      ],
+    },
+    challenge: {
+      fr: 'Créez un orange (255, 80, 0) puis un violet (120, 0, 255).',
+      ar: 'أنشئ لونًا برتقاليًا (255، 80، 0) ثم بنفسجيًا (120، 0، 255).',
+    },
+    hint: {
+      fr: 'Lancez le code : la LED parcourt le cercle chromatique.',
+      ar: 'شغّل الكود: يمرّ المصباح عبر دائرة الألوان.',
+    },
+    code: `// Leçon 10 — mélanger les couleurs
+
+const int ROUGE = 9;
+const int VERT = 10;
+const int BLEU = 11;
+
+void setup() {
+  pinMode(ROUGE, OUTPUT);
+  pinMode(VERT, OUTPUT);
+  pinMode(BLEU, OUTPUT);
+  Serial.begin(9600);
+}
+
+void couleur(int r, int v, int b) {
+  analogWrite(ROUGE, r);
+  analogWrite(VERT, v);
+  analogWrite(BLEU, b);
+  Serial.print("RGB ");
+  Serial.print(r);
+  Serial.print(", ");
+  Serial.print(v);
+  Serial.print(", ");
+  Serial.println(b);
+}
+
+void loop() {
+  couleur(255, 0, 0); delay(700);
+  couleur(0, 255, 0); delay(700);
+  couleur(0, 0, 255); delay(700);
+  couleur(255, 255, 0); delay(700);
+  couleur(0, 255, 255); delay(700);
+  couleur(255, 0, 255); delay(700);
+  couleur(255, 255, 255); delay(700);
+  couleur(0, 0, 0); delay(700);
+}
+`,
+    components: ['rgb', 'resistor', 'wires'],
+    highlightPins: ['9', '10', '11', 'GND'],
+  },
+  {
+    id: 'lcd',
+    title: { fr: 'Afficher sur un LCD', ar: 'العرض على شاشة LCD' },
+    tagline: {
+      fr: 'Un écran 16×2 relié en I2C sur A4 et A5.',
+      ar: 'شاشة 16×2 موصولة عبر I2C على A4 وA5.',
+    },
+    duration: 16,
+    level: { fr: 'Avancé', ar: 'متقدم' },
+    description: {
+      fr: 'Un afficheur LCD 16×2 permet de sortir le programme du moniteur série. Le module I2C ne demande que quatre fils : alimentation, masse, SDA sur A4 et SCL sur A5. Après init() et backlight(), setCursor() place le curseur et print() écrit le texte.',
+      ar: 'تسمح شاشة LCD 16×2 بإخراج البرنامج من مراقب المنفذ التسلسلي. لا تحتاج وحدة I2C سوى أربعة أسلاك: التغذية والأرضي وSDA على A4 وSCL على A5. بعد init() وbacklight() تضع setCursor() المؤشر وتكتب print() النص.',
+    },
+    objectives: {
+      fr: [
+        'Relier un module I2C sur SDA (A4) et SCL (A5).',
+        'Initialiser l’écran et activer le rétroéclairage.',
+        'Positionner et écrire du texte avec setCursor() et print().',
+      ],
+      ar: [
+        'توصيل وحدة I2C على SDA (A4) وSCL (A5).',
+        'تهيئة الشاشة وتشغيل الإضاءة الخلفية.',
+        'تحديد الموضع وكتابة النص باستخدام setCursor() وprint().',
+      ],
+    },
+    wiring: {
+      fr: [
+        'VCC du LCD → 5V.',
+        'GND du LCD → GND.',
+        'SDA → A4.',
+        'SCL → A5.',
+      ],
+      ar: [
+        'VCC للشاشة ← 5V.',
+        'GND للشاشة ← GND.',
+        'SDA ← A4.',
+        'SCL ← A5.',
+      ],
+    },
+    challenge: {
+      fr: 'Affichez un compteur de secondes sur la deuxième ligne, sans effacer la première.',
+      ar: 'اعرض عدّاد ثوانٍ على السطر الثاني دون مسح الأول.',
+    },
+    hint: {
+      fr: 'L’écran LCD affiche le texte envoyé par le programme.',
+      ar: 'تعرض الشاشة النص الذي يرسله البرنامج.',
+    },
+    code: `// Leçon 11 — afficher sur un LCD
+
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+void setup() {
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("Arduino Lab");
+  lcd.setCursor(0, 1);
+  lcd.print("Bonjour !");
+}
+
+void loop() {
+  lcd.setCursor(0, 1);
+  lcd.print("Temps: ");
+  lcd.print(millis() / 1000);
+  lcd.print(" s   ");
+  delay(500);
+}
+`,
+    components: ['lcd', 'wires'],
+    highlightPins: ['A4', 'A5', '5V', 'GND-F'],
+  },
+  {
+    id: 'stepper',
+    title: { fr: 'Piloter un moteur pas à pas', ar: 'التحكم في محرّك خطوي' },
+    tagline: {
+      fr: 'Un 28BYJ-48 et son driver ULN2003, pilotés par la bibliothèque Stepper.',
+      ar: 'محرّك 28BYJ-48 ومشغّله ULN2003 عبر مكتبة Stepper.',
+    },
+    duration: 16,
+    level: { fr: 'Avancé', ar: 'متقدم' },
+    description: {
+      fr: 'Le moteur pas à pas 28BYJ-48 tourne par petits angles précis. Le driver ULN2003 amplifie les quatre commandes envoyées par les broches 8, 10, 9 et 11. La bibliothèque Stepper transforme un nombre de pas en rotation : 2048 pas font un tour complet.',
+      ar: 'يدور المحرّك الخطوي 28BYJ-48 بزوايا صغيرة دقيقة. يضخّم مشغّل ULN2003 الأوامر الأربعة المرسلة من المنافذ 8 و10 و9 و11. تحوّل مكتبة Stepper عدد الخطوات إلى دوران: 2048 خطوة تكمل دورة كاملة.',
+    },
+    objectives: {
+      fr: [
+        'Relier un driver ULN2003 dans le bon ordre.',
+        'Déclarer un objet Stepper et régler sa vitesse.',
+        'Faire tourner le moteur dans les deux sens avec step().',
+      ],
+      ar: [
+        'توصيل مشغّل ULN2003 بالترتيب الصحيح.',
+        'تعريف كائن Stepper وضبط سرعته.',
+        'تدوير المحرّك في الاتجاهين باستخدام step().',
+      ],
+    },
+    wiring: {
+      fr: [
+        'IN1 → broche 8, IN2 → broche 10.',
+        'IN3 → broche 9, IN4 → broche 11.',
+        'VCC du driver → 5V, GND → GND.',
+        'Connecteur blanc du moteur → driver.',
+      ],
+      ar: [
+        'IN1 ← المنفذ 8، IN2 ← المنفذ 10.',
+        'IN3 ← المنفذ 9، IN4 ← المنفذ 11.',
+        'VCC للمشغّل ← 5V، GND ← GND.',
+        'موصل المحرّك الأبيض ← المشغّل.',
+      ],
+    },
+    challenge: {
+      fr: 'Faites deux tours complets dans un sens, puis deux tours dans l’autre.',
+      ar: 'أكمل دورتين كاملتين في اتجاه، ثم دورتين في الاتجاه المعاكس.',
+    },
+    hint: {
+      fr: 'Le moteur tourne par petits pas, pas en continu.',
+      ar: 'يدور المحرّك بخطوات صغيرة، وليس بشكل متواصل.',
+    },
+    code: `// Leçon 12 — moteur pas à pas
+
+#include <Stepper.h>
+
+const int TOURS = 2048;
+Stepper moteur(TOURS, 8, 10, 9, 11);
+
+void setup() {
+  moteur.setSpeed(8);
+  Serial.begin(9600);
+}
+
+void loop() {
+  Serial.println("Sens horaire");
+  moteur.step(512);
+  delay(600);
+  Serial.println("Sens anti-horaire");
+  moteur.step(-512);
+  delay(600);
+}
+`,
+    components: ['stepper', 'wires'],
+    highlightPins: ['8', '9', '10', '11', '5V', 'GND-F'],
   },
 ];
 

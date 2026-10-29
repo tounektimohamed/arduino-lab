@@ -47,9 +47,9 @@ function vec(x: number, y: number, z: number): THREE.Vector3 {
   return new THREE.Vector3(x, y, z);
 }
 
-function archPoints(a: THREE.Vector3, b: THREE.Vector3, lift: number): THREE.Vector3[] {
-  const start = a.clone();
-  const end = b.clone();
+function archPoints(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, lift: number): THREE.Vector3[] {
+  const start = new THREE.Vector3(a.x, a.y, a.z);
+  const end = new THREE.Vector3(b.x, b.y, b.z);
   const mid = start.clone().lerp(end, 0.5);
   mid.y = Math.max(start.y, end.y) + lift;
   const startUp = start.clone();
@@ -60,22 +60,24 @@ function archPoints(a: THREE.Vector3, b: THREE.Vector3, lift: number): THREE.Vec
 }
 
 function lanePoints(
-  start: THREE.Vector3,
-  end: THREE.Vector3,
+  start: { x: number; y: number; z: number },
+  end: { x: number; y: number; z: number },
   laneZ: number,
   laneY: number,
 ): THREE.Vector3[] {
-  const startUp = start.clone();
+  const startVector = new THREE.Vector3(start.x, start.y, start.z);
+  const endVector = new THREE.Vector3(end.x, end.y, end.z);
+  const startUp = startVector.clone();
   startUp.y += 0.45;
-  const endUp = end.clone();
+  const endUp = endVector.clone();
   endUp.y += 0.4;
   return [
-    start,
+    startVector,
     startUp,
     vec(start.x, laneY, laneZ),
     vec(end.x, laneY, laneZ),
     endUp,
-    end,
+    endVector,
   ];
 }
 
@@ -107,6 +109,21 @@ export class ArduinoScene {
   private readonly ldrWires = new THREE.Group();
   private readonly servoGroup = new THREE.Group();
   private readonly servoWires = new THREE.Group();
+  private readonly ledGroup = new THREE.Group();
+  private readonly resistorGroup = new THREE.Group();
+  private readonly ledWires = new THREE.Group();
+  private readonly trafficGroup = new THREE.Group();
+  private readonly trafficWires = new THREE.Group();
+  private readonly temperatureGroup = new THREE.Group();
+  private readonly temperatureWires = new THREE.Group();
+  private readonly ultrasonicGroup = new THREE.Group();
+  private readonly ultrasonicWires = new THREE.Group();
+  private readonly rgbGroup = new THREE.Group();
+  private readonly rgbWires = new THREE.Group();
+  private readonly lcdGroup = new THREE.Group();
+  private readonly lcdWires = new THREE.Group();
+  private readonly stepperGroup = new THREE.Group();
+  private readonly stepperWires = new THREE.Group();
   private readonly lamp = new THREE.Group();
   private readonly soundRings: THREE.Mesh[] = [];
   private readonly dayColor = new THREE.Color('#f2e8d7');
@@ -116,6 +133,15 @@ export class ArduinoScene {
   private servoHorn!: THREE.Group;
   private servoTarget = 90;
   private servoCurrent = 90;
+  private readonly trafficMaterials = new Map<number, THREE.MeshStandardMaterial>();
+  private readonly rgbMaterials = new Map<number, THREE.MeshStandardMaterial>();
+  private rgbLight!: THREE.PointLight;
+  private lcdCanvas!: HTMLCanvasElement;
+  private lcdCtx!: CanvasRenderingContext2D;
+  private lcdTexture!: THREE.CanvasTexture;
+  private stepperHorn!: THREE.Group;
+  private stepperTarget = 0;
+  private stepperCurrent = 0;
   private toneFreq = 0;
   private lightLevel = 0.63;
   private exposure = 1.05;
@@ -193,6 +219,22 @@ export class ArduinoScene {
 
   setLesson(id: LessonId, pins: string[]): void {
     this.activeLesson = id;
+    const baseLed = id === 'blink' || id === 'button' || id === 'pot' || id === 'light';
+    this.ledGroup.visible = baseLed;
+    this.resistorGroup.visible = baseLed;
+    this.ledWires.visible = baseLed;
+    this.trafficGroup.visible = id === 'traffic';
+    this.trafficWires.visible = id === 'traffic';
+    this.temperatureGroup.visible = id === 'temperature';
+    this.temperatureWires.visible = id === 'temperature';
+    this.ultrasonicGroup.visible = id === 'ultrasonic';
+    this.ultrasonicWires.visible = id === 'ultrasonic';
+    this.rgbGroup.visible = id === 'rgb';
+    this.rgbWires.visible = id === 'rgb';
+    this.lcdGroup.visible = id === 'lcd';
+    this.lcdWires.visible = id === 'lcd';
+    this.stepperGroup.visible = id === 'stepper';
+    this.stepperWires.visible = id === 'stepper';
     this.buzzerGroup.visible = id === 'buzzer';
     this.buzzerWires.visible = id === 'buzzer';
     this.ldrGroup.visible = id === 'light';
@@ -207,6 +249,8 @@ export class ArduinoScene {
     this.buttonWires.visible = id === 'button';
     this.potGroup.visible = id === 'pot';
     this.potWires.visible = id === 'pot';
+    this.updateTrafficVisual();
+    this.updateRgbVisual();
 
     for (const [label, ring] of this.rings) {
       const active = pins.includes(label);
@@ -227,6 +271,12 @@ export class ArduinoScene {
   }
 
   private viewTarget(): THREE.Vector3 {
+    if (this.activeLesson === 'lcd' || this.activeLesson === 'ultrasonic') {
+      return vec(0.6, 0.35, 1.8);
+    }
+    if (this.activeLesson === 'stepper') {
+      return vec(1.6, 0.35, 0.5);
+    }
     return vec(0.3, 0.35, this.activeLesson === 'servo' ? 1.6 : 0.25);
   }
 
@@ -538,10 +588,16 @@ export class ArduinoScene {
     this.buildBuzzer();
     this.buildLdr();
     this.buildServo();
+    this.buildTraffic();
+    this.buildTemperature();
+    this.buildUltrasonic();
+    this.buildRgb();
+    this.buildLcd();
+    this.buildStepper();
   }
 
   private buildLed(): void {
-    const group = new THREE.Group();
+    const group = this.ledGroup;
     group.position.set(COMPONENT_LAYOUT.led.x, BREADBOARD.h, COMPONENT_LAYOUT.led.z);
 
     this.ledMaterial = new THREE.MeshStandardMaterial({
@@ -596,7 +652,7 @@ export class ArduinoScene {
   }
 
   private buildResistor(): void {
-    const group = new THREE.Group();
+    const group = this.resistorGroup;
     group.position.set(
       (COMPONENT_LAYOUT.resistor.left.x + COMPONENT_LAYOUT.resistor.right.x) / 2,
       BREADBOARD.h,
@@ -893,6 +949,474 @@ export class ArduinoScene {
     this.scene.add(this.servoGroup);
   }
 
+  private createLed(
+    color: number,
+    emissive: number,
+  ): { group: THREE.Group; material: THREE.MeshStandardMaterial } {
+    const group = new THREE.Group();
+    const material = new THREE.MeshStandardMaterial({
+      color,
+      emissive,
+      emissiveIntensity: 0,
+      roughness: 0.22,
+      metalness: 0.05,
+      transparent: true,
+      opacity: 0.9,
+    });
+
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.34, 18), material);
+    body.position.y = 0.5;
+    body.castShadow = true;
+    group.add(body);
+
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+      material,
+    );
+    dome.position.y = 0.67;
+    dome.scale.y = 0.7;
+    group.add(dome);
+
+    const legMat = std(0xc9c9c9, { metalness: 0.7, roughness: 0.3 });
+    for (const dx of [-0.12, 0.12]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.36, 8), legMat);
+      leg.position.set(dx, 0.18, 0);
+      group.add(leg);
+    }
+
+    return { group, material };
+  }
+
+  private addResistor(group: THREE.Group, x: number, z: number): void {
+    const resistor = new THREE.Group();
+    resistor.position.set(x, 0, z);
+
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.085, 0.085, 0.58, 14),
+      std(0xd8b98c, { roughness: 0.6 }),
+    );
+    body.rotation.z = Math.PI / 2;
+    body.position.y = 0.27;
+    body.castShadow = true;
+    resistor.add(body);
+
+    for (const band of [
+      { offset: -0.15, color: 0x7a4a2a },
+      { offset: 0, color: 0xd0453a },
+      { offset: 0.15, color: 0xd8a63a },
+    ]) {
+      const ring = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.088, 0.088, 0.032, 14),
+        std(band.color, { roughness: 0.5 }),
+      );
+      ring.rotation.z = Math.PI / 2;
+      ring.position.set(band.offset, 0.27, 0);
+      resistor.add(ring);
+    }
+
+    const legMat = std(0xc9c9c9, { metalness: 0.7, roughness: 0.3 });
+    for (const dx of [-0.39, 0.39]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.26, 8), legMat);
+      leg.position.set(dx, 0.13, 0);
+      resistor.add(leg);
+    }
+
+    group.add(resistor);
+  }
+
+  private buildTraffic(): void {
+    const originX = holeX(7);
+    const originZ = holeZ(4);
+    this.trafficGroup.position.set(originX, BREADBOARD.h, originZ);
+
+    const leds = [
+      { pin: 9, x: -1.1, color: 0xff4b3a, emissive: 0xff1a0a },
+      { pin: 10, x: 0, color: 0xffb43a, emissive: 0xff8a00 },
+      { pin: 11, x: 1.1, color: 0x49d17a, emissive: 0x00b84a },
+    ];
+
+    for (const def of leds) {
+      const led = this.createLed(def.color, def.emissive);
+      led.group.position.set(def.x, 0, 0);
+      this.trafficGroup.add(led.group);
+      this.trafficMaterials.set(def.pin, led.material);
+      this.addResistor(this.trafficGroup, def.x, 1.35);
+    }
+
+    this.trafficGroup.visible = false;
+    this.scene.add(this.trafficGroup);
+
+    const gnd = vec(POWER_GND.x, POWER_GND.y, POWER_GND.z);
+    for (const def of leds) {
+      const pin = pinWorld(String(def.pin));
+      const left = vec(originX + def.x - 0.39, 1.08, originZ + 1.35);
+      const right = vec(originX + def.x + 0.39, 1.08, originZ + 1.35);
+      const anode = vec(originX + def.x + 0.12, 1.12, originZ);
+      const cathode = vec(originX + def.x - 0.12, 1.12, originZ);
+      this.trafficWires.add(
+        wireMesh(lanePoints(pin, left, -3.35, 1.35), COLORS.green),
+        wireMesh(archPoints(right, anode, 0.55), COLORS.green),
+        wireMesh(lanePoints(cathode, gnd, 3.55, 1.25), COLORS.black),
+      );
+    }
+    this.trafficWires.visible = false;
+    this.scene.add(this.trafficWires);
+  }
+
+  private buildTemperature(): void {
+    const originX = holeX(16);
+    const originZ = holeZ(8);
+    this.temperatureGroup.position.set(originX, BREADBOARD.h, originZ);
+
+    const body = new THREE.Mesh(
+      new RoundedBoxGeometry(0.52, 0.62, 0.16, 2, 0.04),
+      std(0x24272b, { roughness: 0.75 }),
+    );
+    body.position.y = 0.5;
+    body.castShadow = true;
+    this.temperatureGroup.add(body);
+
+    const face = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.38, 0.46),
+      std(0x3b4047, { roughness: 0.6 }),
+    );
+    face.position.set(0, 0.5, 0.085);
+    this.temperatureGroup.add(face);
+
+    const dot = new THREE.Mesh(
+      new THREE.CircleGeometry(0.032, 12),
+      new THREE.MeshBasicMaterial({ color: 0xe8e2d4 }),
+    );
+    dot.position.set(-0.15, 0.77, 0.086);
+    this.temperatureGroup.add(dot);
+
+    const legMat = std(0xc9c9c9, { metalness: 0.7, roughness: 0.3 });
+    for (const dx of [-0.15, 0, 0.15]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.3, 8), legMat);
+      leg.position.set(dx, 0.18, 0);
+      this.temperatureGroup.add(leg);
+    }
+
+    this.temperatureGroup.visible = false;
+    this.scene.add(this.temperatureGroup);
+
+    const v5 = pinWorld('5V');
+    const a2 = pinWorld('A2');
+    const gnd = vec(POWER_GND.x, POWER_GND.y, POWER_GND.z);
+    const left = vec(originX - 0.15, 0.9, originZ);
+    const middle = vec(originX, 0.9, originZ);
+    const right = vec(originX + 0.15, 0.9, originZ);
+
+    this.temperatureWires.add(
+      wireMesh(lanePoints(v5, left, -3.3, 1.4), COLORS.red),
+      wireMesh(archPoints(a2, middle, 1.2), COLORS.orange),
+      wireMesh(lanePoints(gnd, right, 3.55, 1.25), COLORS.black),
+    );
+    this.temperatureWires.visible = false;
+    this.scene.add(this.temperatureWires);
+  }
+
+  private buildUltrasonic(): void {
+    const originX = -3.5;
+    const originZ = 4.0;
+    this.ultrasonicGroup.position.set(originX, 0, originZ);
+
+    const pcb = new THREE.Mesh(
+      new RoundedBoxGeometry(3.1, 0.12, 1.45, 2, 0.05),
+      std(0x2f5fa8, { roughness: 0.55 }),
+    );
+    pcb.position.y = 0.22;
+    pcb.castShadow = true;
+    this.ultrasonicGroup.add(pcb);
+
+    const metal = std(0xc7c9c8, { metalness: 0.75, roughness: 0.3 });
+    for (const dx of [-0.82, 0.82]) {
+      const can = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.3, 24), metal);
+      can.rotation.x = Math.PI / 2;
+      can.position.set(dx, 0.52, 0.52);
+      can.castShadow = true;
+      this.ultrasonicGroup.add(can);
+
+      const grille = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.27, 0.27, 0.04, 20),
+        std(0x30353a, { roughness: 0.8 }),
+      );
+      grille.rotation.x = Math.PI / 2;
+      grille.position.set(dx, 0.52, 0.7);
+      this.ultrasonicGroup.add(grille);
+    }
+
+    const crystal = new THREE.Mesh(
+      new THREE.BoxGeometry(0.26, 0.12, 0.26),
+      std(0xbfc4c6, { metalness: 0.4, roughness: 0.4 }),
+    );
+    crystal.position.set(0, 0.45, 0.1);
+    this.ultrasonicGroup.add(crystal);
+
+    const legMat = std(0xc9c9c9, { metalness: 0.7, roughness: 0.3 });
+    for (const dx of [-0.9, -0.3, 0.3, 0.9]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.22, 8), legMat);
+      leg.position.set(dx, 0.12, -0.78);
+      this.ultrasonicGroup.add(leg);
+    }
+
+    this.ultrasonicGroup.visible = false;
+    this.scene.add(this.ultrasonicGroup);
+
+    const v5 = pinWorld('5V');
+    const trig = pinWorld('7');
+    const echo = pinWorld('6');
+    const gnd = vec(POWER_GND.x, POWER_GND.y, POWER_GND.z);
+    const pin = (dx: number): THREE.Vector3 => vec(originX + dx, 0.8, originZ - 0.78);
+
+    this.ultrasonicWires.add(
+      wireMesh(lanePoints(trig, pin(-0.9), -3.25, 1.45), COLORS.orange),
+      wireMesh(lanePoints(echo, pin(-0.3), -3.05, 1.35), COLORS.blue),
+      wireMesh(lanePoints(v5, pin(0.3), -2.85, 1.25), COLORS.red),
+      wireMesh(lanePoints(gnd, pin(0.9), 3.7, 1.2), COLORS.black),
+    );
+    this.ultrasonicWires.visible = false;
+    this.scene.add(this.ultrasonicWires);
+  }
+
+  private buildRgb(): void {
+    const originX = holeX(7);
+    const originZ = holeZ(4);
+    this.rgbGroup.position.set(originX, BREADBOARD.h, originZ);
+
+    const shell = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.36, 0.4, 0.6, 24),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.08,
+        metalness: 0,
+        transparent: true,
+        opacity: 0.2,
+      }),
+    );
+    shell.position.y = 0.55;
+    shell.castShadow = true;
+    this.rgbGroup.add(shell);
+
+    const channels = [
+      { pin: 9, x: -0.08, color: 0xff3b2f, emissive: 0xff1200 },
+      { pin: 10, x: 0.08, color: 0x3bd96b, emissive: 0x00c43c },
+      { pin: 11, x: 0.24, color: 0x3f7bff, emissive: 0x003cff },
+    ];
+    for (const channel of channels) {
+      const material = new THREE.MeshStandardMaterial({
+        color: channel.color,
+        emissive: channel.emissive,
+        emissiveIntensity: 0,
+        roughness: 0.25,
+        transparent: true,
+        opacity: 0.95,
+      });
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 10), material);
+      dome.position.set(channel.x, 0.58, 0);
+      this.rgbGroup.add(dome);
+      this.rgbMaterials.set(channel.pin, material);
+      this.addResistor(this.rgbGroup, channel.x - 0.1, 1.35);
+    }
+
+    const legMat = std(0xc9c9c9, { metalness: 0.7, roughness: 0.3 });
+    for (const dx of [-0.24, -0.08, 0.08, 0.24]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.38, 8), legMat);
+      leg.position.set(dx, 0.18, 0);
+      this.rgbGroup.add(leg);
+    }
+
+    this.rgbLight = new THREE.PointLight(0xffffff, 0, 3.2, 2);
+    this.rgbLight.position.set(0, 0.65, 0);
+    this.rgbGroup.add(this.rgbLight);
+
+    this.rgbGroup.visible = false;
+    this.scene.add(this.rgbGroup);
+
+    const gnd = vec(POWER_GND.x, POWER_GND.y, POWER_GND.z);
+    const anodeX = [-0.08, 0.08, 0.24];
+    channels.forEach((channel, index) => {
+      const pin = pinWorld(String(channel.pin));
+      const left = vec(originX + channel.x - 0.1 - 0.39, 1.08, originZ + 1.35);
+      const right = vec(originX + channel.x - 0.1 + 0.39, 1.08, originZ + 1.35);
+      const anode = vec(originX + anodeX[index], 1.12, originZ);
+      this.rgbWires.add(
+        wireMesh(lanePoints(pin, left, -3.35, 1.35), COLORS.green),
+        wireMesh(archPoints(right, anode, 0.5), COLORS.green),
+      );
+    });
+    this.rgbWires.add(
+      wireMesh(
+        lanePoints(vec(originX - 0.24, 1.12, originZ), gnd, 3.55, 1.25),
+        COLORS.black,
+      ),
+    );
+    this.rgbWires.visible = false;
+    this.scene.add(this.rgbWires);
+  }
+
+  private buildLcd(): void {
+    const originX = 2.8;
+    const originZ = 4.15;
+    this.lcdGroup.position.set(originX, 0, originZ);
+
+    const pcb = new THREE.Mesh(
+      new RoundedBoxGeometry(4.7, 0.18, 1.95, 2, 0.05),
+      std(0x123f52, { roughness: 0.55 }),
+    );
+    pcb.position.y = 0.09;
+    pcb.castShadow = true;
+    this.lcdGroup.add(pcb);
+
+    this.lcdCanvas = document.createElement('canvas');
+    this.lcdCanvas.width = 512;
+    this.lcdCanvas.height = 192;
+    const ctx = this.lcdCanvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D indisponible pour le LCD.');
+    this.lcdCtx = ctx;
+    this.lcdTexture = new THREE.CanvasTexture(this.lcdCanvas);
+    this.lcdTexture.colorSpace = THREE.SRGBColorSpace;
+    this.lcdTexture.anisotropy = 8;
+
+    const screen = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.9, 1.35),
+      new THREE.MeshBasicMaterial({ map: this.lcdTexture, toneMapped: false }),
+    );
+    screen.rotation.x = -Math.PI / 2;
+    screen.position.set(0, 0.2, 0.04);
+    this.lcdGroup.add(screen);
+
+    const legMat = std(0xc9c9c9, { metalness: 0.7, roughness: 0.3 });
+    for (const dx of [-1.0, -0.33, 0.33, 1.0]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.24, 8), legMat);
+      leg.position.set(dx, 0.1, -1.02);
+      this.lcdGroup.add(leg);
+    }
+
+    this.setLcdVisual(['', ''], true);
+    this.lcdGroup.visible = false;
+    this.scene.add(this.lcdGroup);
+
+    const sda = pinWorld('A4');
+    const scl = pinWorld('A5');
+    const v5 = pinWorld('5V');
+    const gnd = vec(POWER_GND.x, POWER_GND.y, POWER_GND.z);
+    const pin = (dx: number): THREE.Vector3 => vec(originX + dx, 0.8, originZ - 1.02);
+
+    this.lcdWires.add(
+      wireMesh(lanePoints(sda, pin(-1.0), 3.7, 1.35), COLORS.blue),
+      wireMesh(lanePoints(scl, pin(-0.33), 3.55, 1.25), COLORS.orange),
+      wireMesh(lanePoints(v5, pin(0.33), -3.2, 1.4), COLORS.red),
+      wireMesh(lanePoints(gnd, pin(1.0), 3.85, 1.45), COLORS.black),
+    );
+    this.lcdWires.visible = false;
+    this.scene.add(this.lcdWires);
+  }
+
+  private setLcdVisual(lines: [string, string], backlight: boolean): void {
+    const ctx = this.lcdCtx;
+    const width = this.lcdCanvas.width;
+    const height = this.lcdCanvas.height;
+    ctx.fillStyle = backlight ? '#176b5c' : '#16332e';
+    ctx.fillRect(0, 0, width, height);
+    ctx.strokeStyle = backlight ? '#4fb79d' : '#2e5a50';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(4, 4, width - 8, height - 8);
+    ctx.fillStyle = backlight ? '#d6ffe8' : '#6f9588';
+    ctx.font = '700 30px "Courier New", monospace';
+    ctx.textBaseline = 'top';
+    for (let index = 0; index < 2; index++) {
+      const text = (lines[index] ?? '').padEnd(16, ' ').slice(0, 16);
+      ctx.fillText(text, 24, 26 + index * 66);
+    }
+    this.lcdTexture.needsUpdate = true;
+  }
+
+  private buildStepper(): void {
+    const originX = 5.2;
+    const originZ = -1.7;
+    this.stepperGroup.position.set(originX, 0, originZ);
+
+    const blue = std(0x2f6bb5, { roughness: 0.45 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.0, 24), blue);
+    body.position.y = 0.5;
+    body.castShadow = true;
+    this.stepperGroup.add(body);
+
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.53, 0.53, 0.08, 24), std(0x22518c));
+    cap.position.y = 1.02;
+    this.stepperGroup.add(cap);
+
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, 0.2, 12),
+      std(0xc9c9c9, { metalness: 0.7, roughness: 0.3 }),
+    );
+    shaft.position.y = 1.16;
+    this.stepperGroup.add(shaft);
+
+    this.stepperHorn = new THREE.Group();
+    this.stepperHorn.position.y = 1.26;
+    const white = std(0xf2eee6, { roughness: 0.5 });
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.12, 18), white);
+    this.stepperHorn.add(hub);
+    const arm = new THREE.Mesh(new RoundedBoxGeometry(0.95, 0.07, 0.18, 1, 0.03), white);
+    arm.position.x = 0.38;
+    arm.castShadow = true;
+    this.stepperHorn.add(arm);
+    this.stepperGroup.add(this.stepperHorn);
+
+    const driver = new THREE.Mesh(
+      new RoundedBoxGeometry(1.3, 0.12, 0.9, 2, 0.04),
+      std(0xb23a32, { roughness: 0.55 }),
+    );
+    driver.position.set(0, 0.06, 1.25);
+    driver.castShadow = true;
+    this.stepperGroup.add(driver);
+
+    const chip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.62, 0.08, 0.34),
+      std(0x1d2023, { roughness: 0.7 }),
+    );
+    chip.position.set(0, 0.16, 1.25);
+    this.stepperGroup.add(chip);
+
+    const connector = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.18, 0.24),
+      std(0xe7e2d8, { roughness: 0.6 }),
+    );
+    connector.position.set(0, 0.18, 1.56);
+    this.stepperGroup.add(connector);
+
+    this.stepperGroup.visible = false;
+    this.scene.add(this.stepperGroup);
+
+    const v5 = pinWorld('5V');
+    const gnd = vec(POWER_GND.x, POWER_GND.y, POWER_GND.z);
+    const motorPins = [pinWorld('8'), pinWorld('10'), pinWorld('9'), pinWorld('11')];
+    const driverPins = [
+      vec(originX - 0.45, 0.3, originZ + 0.8),
+      vec(originX - 0.15, 0.3, originZ + 0.8),
+      vec(originX + 0.15, 0.3, originZ + 0.8),
+      vec(originX + 0.45, 0.3, originZ + 0.8),
+    ];
+    const wireColors = [COLORS.blue, 0xd45aa0, COLORS.orange, COLORS.green];
+
+    motorPins.forEach((pin, index) => {
+      this.stepperWires.add(
+        wireMesh(
+          lanePoints(pin, driverPins[index], -3.25 - index * 0.08, 1.3 + index * 0.04),
+          wireColors[index],
+        ),
+      );
+    });
+    this.stepperWires.add(
+      wireMesh(lanePoints(v5, vec(originX + 0.55, 0.2, originZ + 1.25), -3.6, 1.5), COLORS.red),
+      wireMesh(lanePoints(gnd, vec(originX - 0.55, 0.2, originZ + 1.25), 3.7, 1.4), COLORS.black),
+    );
+    this.stepperWires.visible = false;
+    this.scene.add(this.stepperWires);
+  }
+
   private buildExtraWires(): void {
     const v = (p: { x: number; y: number; z: number }): THREE.Vector3 => vec(p.x, p.y, p.z);
     const p8 = v(pinWorld('8'));
@@ -952,7 +1476,7 @@ export class ArduinoScene {
     const potM = vec(COMPONENT_LAYOUT.pot.middle.x, 1.02, COMPONENT_LAYOUT.pot.middle.z);
     const potR = vec(COMPONENT_LAYOUT.pot.right.x, 1.02, COMPONENT_LAYOUT.pot.right.z);
 
-    const base = new THREE.Group();
+    const base = this.ledWires;
     base.add(
       wireMesh(archPoints(vec(p9.x, p9.y, p9.z), rLeft, 1.25), COLORS.green),
       wireMesh(archPoints(rRight, ledAnode, 0.55), COLORS.green),
@@ -987,7 +1511,23 @@ export class ArduinoScene {
   }
 
   private buildHighlights(): void {
-    for (const label of ['9', '2', 'A0', '5V', 'GND', 'GND-F', '8', '10', 'A1']) {
+    for (const label of [
+      '9',
+      '2',
+      'A0',
+      '5V',
+      'GND',
+      'GND-F',
+      '8',
+      '10',
+      'A1',
+      '6',
+      '7',
+      '11',
+      'A2',
+      'A4',
+      'A5',
+    ]) {
       const pin = label === 'GND-F' ? POWER_GND : pinWorld(label);
 
       const ring = new THREE.Mesh(
@@ -1192,12 +1732,18 @@ export class ArduinoScene {
         this.toneFreq = 0;
         this.ledTarget = 0;
         this.onboardTarget = 0;
+        this.stepperTarget = 0;
         this.setButtonVisual(false);
+        this.updateTrafficVisual();
+        this.updateRgbVisual();
+        this.setLcdVisual(['', ''], true);
         break;
       case 'pin':
       case 'pwm':
         this.ledTarget = this.board.ledBrightness(9);
         this.onboardTarget = this.board.ledBrightness(13);
+        this.updateTrafficVisual();
+        this.updateRgbVisual();
         break;
       case 'button':
         this.setButtonVisual(event.pressed);
@@ -1214,8 +1760,41 @@ export class ArduinoScene {
       case 'light':
         this.setLightVisual(event.value);
         break;
+      case 'stepper':
+        this.stepperTarget = event.angle;
+        break;
+      case 'lcd':
+        this.setLcdVisual(event.lines, event.backlight);
+        break;
+      case 'temperature':
+      case 'distance':
+        break;
     }
   };
+
+  private updateTrafficVisual(): void {
+    for (const [pin, material] of this.trafficMaterials) {
+      const value = this.board.ledBrightness(pin);
+      material.emissiveIntensity = value * 2.8;
+      material.opacity = 0.72 + value * 0.28;
+    }
+  }
+
+  private updateRgbVisual(): void {
+    let red = 0;
+    let green = 0;
+    let blue = 0;
+    for (const [pin, material] of this.rgbMaterials) {
+      const value = this.board.ledBrightness(pin);
+      material.emissiveIntensity = value * 2.8;
+      material.opacity = 0.75 + value * 0.25;
+      if (pin === 9) red = value;
+      if (pin === 10) green = value;
+      if (pin === 11) blue = value;
+    }
+    this.rgbLight.color.setRGB(red, green, blue);
+    this.rgbLight.intensity = (red + green + blue) * 1.1;
+  }
 
   private setButtonVisual(pressed: boolean): void {
     this.buttonCap.position.y = this.buttonCapY - (pressed ? 0.05 : 0);
@@ -1258,6 +1837,10 @@ export class ArduinoScene {
     const maxStep = 420 * delta;
     this.servoCurrent += Math.max(-maxStep, Math.min(maxStep, this.servoTarget - this.servoCurrent));
     this.servoHorn.rotation.y = THREE.MathUtils.degToRad(this.servoCurrent);
+
+    this.stepperCurrent +=
+      (this.stepperTarget - this.stepperCurrent) * Math.min(1, delta * 10);
+    this.stepperHorn.rotation.y = THREE.MathUtils.degToRad(this.stepperCurrent);
 
     this.soundRings.forEach((ring, index) => {
       const material = ring.material as THREE.MeshBasicMaterial;
