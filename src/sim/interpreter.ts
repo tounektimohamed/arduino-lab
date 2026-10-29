@@ -201,7 +201,7 @@ class Parser {
     const functions = new Map<string, FuncDef>();
 
     while (!this.atEnd()) {
-      if (this.isTypeStart()) {
+      if (this.isDeclarationStart()) {
         const save = this.index;
         while (this.peek().type === 'id' && MODIFIERS.has(this.peek().value)) this.next();
         if (this.peek().type === 'id' && TYPE_WORDS.has(this.peek().value)) {
@@ -259,7 +259,7 @@ class Parser {
       this.expect(';');
       return { type: 'break' };
     }
-    if (this.isTypeStart()) return this.parseDeclaration();
+    if (this.isDeclarationStart()) return this.parseDeclaration();
 
     const expr = this.parseExpression();
     this.expect(';');
@@ -286,7 +286,7 @@ class Parser {
     this.expect('(');
     let init: Stmt | null = null;
     if (!this.check(';')) {
-      if (this.isTypeStart()) {
+      if (this.isDeclarationStart()) {
         init = this.parseDeclaration();
       } else {
         init = { type: 'expr', expr: this.parseExpression() };
@@ -450,6 +450,11 @@ class Parser {
 
   private isTypeStart(): boolean {
     return this.peek().type === 'id' && TYPE_WORDS.has(this.peek().value);
+  }
+
+  private isDeclarationStart(): boolean {
+    if (this.peek().type !== 'id') return false;
+    return MODIFIERS.has(this.peek().value) || TYPE_WORDS.has(this.peek().value);
   }
 
   private peek(offset = 0): Token {
