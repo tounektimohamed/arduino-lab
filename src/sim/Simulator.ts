@@ -91,6 +91,8 @@ export class Simulator {
       lcdPrint: (text, newline) => board.lcdPrint(text, newline ?? false),
       lcdBacklight: (on) => board.lcdBacklight(on),
       pulseIn: (pin, state) => board.pulseIn(pin, state),
+      motorSetSpeed: (id, speed) => board.motorSetSpeed(id, speed),
+      motorRun: (id, mode) => board.motorRun(id, mode),
     };
   }
 

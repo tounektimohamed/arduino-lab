@@ -111,6 +111,10 @@ export class ArduinoScene {
   private readonly lcdWires = new THREE.Group();
   private readonly ultraGroup = new THREE.Group();
   private readonly tmpGroup = new THREE.Group();
+  private readonly shieldGroup = new THREE.Group();
+  private readonly batteryGroup = new THREE.Group();
+  private readonly batteryWires = new THREE.Group();
+  private readonly motorRigs: { group: THREE.Group; wheel: THREE.Group; wires: THREE.Group; omega: number }[] = [];
   private readonly tmpWires = new THREE.Group();
   private tmpHalo!: THREE.Mesh;
   private readonly ultraWires = new THREE.Group();
@@ -234,6 +238,14 @@ export class ArduinoScene {
     this.ultraGroup.visible = has('ultrasonic');
     this.ultraWires.visible = has('ultrasonic');
     this.tmpGroup.visible = has('tmp36');
+    this.shieldGroup.visible = has('shield');
+    this.batteryGroup.visible = has('battery');
+    this.batteryWires.visible = has('battery');
+    this.motorRigs.forEach((rig, index) => {
+      const on = has(index === 0 ? 'dcmotor' : 'dcmotor2');
+      rig.group.visible = on;
+      rig.wires.visible = on;
+    });
     this.tmpWires.visible = has('tmp36');
     this.ballGroup.visible = has('ultrasonic');
     const nextTarget = this.viewTarget();
@@ -264,7 +276,7 @@ export class ArduinoScene {
   }
 
   private viewTarget(): THREE.Vector3 {
-    const near = ['servo', 'lcd', 'ultrasonic'].some((name) => this.activeComponents.includes(name));
+    const near = ['servo', 'lcd', 'ultrasonic', 'shield'].some((name) => this.activeComponents.includes(name));
     return vec(0.3, 0.35, near ? 1.6 : 0.25);
   }
 
@@ -717,6 +729,9 @@ export class ArduinoScene {
     this.buildLcd();
     this.buildUltrasonic();
     this.buildTmp();
+    this.buildShield();
+    this.buildMotors();
+    this.buildBattery();
   }
 
   private buildLed(): void {
@@ -1342,6 +1357,158 @@ export class ArduinoScene {
     (this.tmpHalo.material as THREE.MeshBasicMaterial).color.setHSL(0.6 - t * 0.6, 0.85, 0.5);
   }
 
+  /**
+   * Motor Shield L293D empilé sur l'Uno (la carte reste visible dessous : USB, prise DC).
+   * Bornes à vis le long du bord avant : M1, M2, M3, M4 (moteurs) et EXT_PWR (alimentation externe).
+   */
+  private buildShield(): void {
+    const group = this.shieldGroup;
+    group.position.set(BOARD.x, 0.62, BOARD.z);
+
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.08, 5.34), std(0x1d2b4a, { roughness: 0.55 }));
+    pcb.position.x = 0.43;
+    pcb.castShadow = true;
+    pcb.receiveShadow = true;
+    group.add(pcb);
+    this.registerPart(pcb, 'shield');
+
+    for (const z of [-2.12, 2.12]) {
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.3, 0.24), std(0x15171a));
+      strip.position.set(0.1, -0.19, z);
+      group.add(strip);
+    }
+
+    const black = std(0x111214, { roughness: 0.5 });
+    const chip = (x: number, z: number, width: number, key: string): void => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, 0.16, 0.5), black);
+      mesh.position.set(x, 0.12, z);
+      group.add(mesh);
+      this.registerPart(mesh, key);
+    };
+    chip(-0.3, -1.0, 1.0, 'l293d');
+    chip(1.2, -1.0, 1.0, 'l293d');
+    chip(0.45, 0.2, 0.9, 'shiftreg');
+
+    const screwMat = std(0xb8bcc2, { metalness: 0.8, roughness: 0.35 });
+    const terminal = (x: number, color: number, key: string, label: string): void => {
+      const block = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.5), std(color, { roughness: 0.5 }));
+      block.position.set(x, 0.24, 2.2);
+      block.castShadow = true;
+      group.add(block);
+      this.registerPart(block, key);
+      for (const dx of [-0.2, 0.2]) {
+        const screw = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.06, 14), screwMat);
+        screw.position.set(x + dx, 0.47, 2.2);
+        group.add(screw);
+      }
+      const text = textPlane(label, 0.9);
+      text.position.set(x, 0.05, 1.75);
+      group.add(text);
+    };
+    terminal(-1.4, 0x1f6fb8, 'terminals', 'M1');
+    terminal(-0.4, 0x1f6fb8, 'terminals', 'M2');
+    terminal(0.6, 0x1f6fb8, 'terminals', 'M3');
+    terminal(1.6, 0x1f6fb8, 'terminals', 'M4');
+    terminal(2.8, 0x2e7d32, 'extpwr', 'EXT_PWR');
+
+    group.visible = false;
+    this.scene.add(group);
+  }
+
+  /** Deux moteurs jaunes à réducteur, roue visible : la roue tourne selon le sens et la vitesse. */
+  private buildMotors(): void {
+    const termX = [-1.4, -0.4];
+    [-3.4, 0.8].forEach((x, index) => {
+      const group = new THREE.Group();
+      group.position.set(x, 0, 5.6);
+
+      const gearbox = new THREE.Mesh(new RoundedBoxGeometry(1.0, 0.9, 1.0, 2, 0.06), std(0xf2c230, { roughness: 0.5 }));
+      gearbox.position.y = 0.78;
+      gearbox.castShadow = true;
+      group.add(gearbox);
+
+      const can = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.32, 0.32, 1.0, 20),
+        std(0xb9bdc4, { metalness: 0.7, roughness: 0.35 }),
+      );
+      can.rotation.x = Math.PI / 2;
+      can.position.set(0, 0.78, -1.0);
+      can.castShadow = true;
+      group.add(can);
+
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.06, 20), std(0x2b2b30));
+      cap.rotation.x = Math.PI / 2;
+      cap.position.set(0, 0.78, -1.53);
+      group.add(cap);
+
+      const gold = std(0xd4af37, { metalness: 0.8, roughness: 0.3 });
+      for (const dy of [0.12, -0.12]) {
+        const tab = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.14), gold);
+        tab.position.set(0, 0.78 + dy, -1.62);
+        group.add(tab);
+      }
+
+      const wheel = new THREE.Group();
+      wheel.position.set(0, 0.78, 0.78);
+      const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.3, 32), std(0x1a1a1d, { roughness: 0.9 }));
+      tire.rotation.x = Math.PI / 2;
+      tire.castShadow = true;
+      wheel.add(tire);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.34, 24), std(0xe8e4da));
+      hub.rotation.x = Math.PI / 2;
+      wheel.add(hub);
+      for (let i = 0; i < 3; i++) {
+        const spoke = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.09, 0.02), std(0xb3402f));
+        spoke.rotation.z = (i * Math.PI) / 3;
+        spoke.position.z = 0.17;
+        wheel.add(spoke);
+      }
+      const marker = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.32), std(0xd0453a));
+      marker.position.y = 0.66;
+      wheel.add(marker);
+      group.add(wheel);
+
+      group.visible = false;
+      this.registerPart(group, 'dcmotor');
+      this.scene.add(group);
+
+      // Fils : chaque patte du moteur va sur une vis de sa borne (M1 ou M2).
+      const wires = new THREE.Group();
+      const bx = BOARD.x + termX[index];
+      wires.add(
+        wireMesh(archPoints(vec(x, 0.9, 3.98), vec(bx - 0.2, 1.14, 2.2), 1.0), COLORS.red),
+        wireMesh(archPoints(vec(x, 0.66, 3.98), vec(bx + 0.2, 1.14, 2.2), 0.8), COLORS.black),
+      );
+      wires.visible = false;
+      this.scene.add(wires);
+      this.motorRigs.push({ group, wheel, wires, omega: 0 });
+    });
+  }
+
+  /** Pack de 4 piles AA relié à la borne EXT_PWR : alimentation séparée pour les moteurs. */
+  private buildBattery(): void {
+    const group = this.batteryGroup;
+    group.position.set(5.4, 0, 5.0);
+    const body = new THREE.Mesh(new RoundedBoxGeometry(2.4, 0.7, 1.1, 2, 0.05), std(0x2a2d33, { roughness: 0.6 }));
+    body.position.y = 0.35;
+    body.castShadow = true;
+    group.add(body);
+    const text = textPlane('4×AA 6V', 1.6);
+    text.position.set(0, 0.72, 0);
+    group.add(text);
+    group.visible = false;
+    this.registerPart(group, 'battery');
+    this.scene.add(group);
+
+    const ext = BOARD.x + 2.8;
+    this.batteryWires.add(
+      wireMesh(archPoints(vec(4.2, 0.5, 4.8), vec(ext + 0.2, 1.14, 2.2), 1.2), COLORS.red),
+      wireMesh(archPoints(vec(4.2, 0.4, 5.2), vec(ext - 0.2, 1.14, 2.2), 0.9), COLORS.black),
+    );
+    this.batteryWires.visible = false;
+    this.scene.add(this.batteryWires);
+  }
+
   private buildExtraWires(): void {
     const v = (p: { x: number; y: number; z: number }): THREE.Vector3 => vec(p.x, p.y, p.z);
     const p8 = v(pinWorld('8'));
@@ -1696,6 +1863,11 @@ export class ArduinoScene {
       case 'temp':
         this.setTempVisual(event.value);
         break;
+      case 'motor': {
+        const rig = this.motorRigs[event.id - 1];
+        if (rig) rig.omega = event.velocity * 14;
+        break;
+      }
     }
   };
 
@@ -1759,6 +1931,8 @@ export class ArduinoScene {
       material.color.setHSL(Math.min(0.85, this.toneFreq / 1400), 0.65, 0.5);
     });
 
+    for (const rig of this.motorRigs) rig.wheel.rotation.z -= rig.omega * delta;
+
     const pinging = time < this.pingUntil;
     const travel = this.distanceCm * 0.08;
     this.pingRings.forEach((ring, index) => {
@@ -1792,4 +1966,27 @@ export class ArduinoScene {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
   }
+}
+
+/** Petit texte blanc à plat (inscription sur le circuit imprimé ou une étiquette). */
+function textPlane(text: string, width: number): THREE.Mesh {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = '#e9eef7';
+    ctx.font = 'bold 44px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 34);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, width / 4),
+    new THREE.MeshBasicMaterial({ map: texture, transparent: true }),
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  return mesh;
 }

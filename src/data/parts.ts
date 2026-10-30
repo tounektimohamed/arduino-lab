@@ -106,6 +106,34 @@ export const BOARD_PARTS: Record<string, PartInfo> = {
       ar: '‏5V و3V3 وVIN تغذّي مكوّناتك؛ و GND هو الأرضي المشترك للدائرة.',
     },
   },
+  l293d: {
+    name: { fr: 'Pont en H L293D', ar: 'قنطرة H ‏L293D' },
+    role: {
+      fr: 'Inverse le sens du courant dans un moteur et module sa vitesse en PWM ; chaque puce commande 2 moteurs.',
+      ar: 'تعكس اتجاه التيار في المحرك وتضبط سرعته بـ PWM؛ كل شريحة تقود محركين.',
+    },
+  },
+  shiftreg: {
+    name: { fr: 'Registre à décalage 74HC595', ar: 'مسجّل إزاحة 74HC595' },
+    role: {
+      fr: 'Le shield l’utilise pour envoyer le sens des moteurs avec seulement 3 broches de l’Uno.',
+      ar: 'يستخدمه الدرع لإرسال اتجاه المحركات عبر 3 منافذ فقط من Uno.',
+    },
+  },
+  terminals: {
+    name: { fr: 'Bornes M1 à M4', ar: 'أطراف M1 إلى M4' },
+    role: {
+      fr: 'Bornes à vis pour brancher les moteurs DC : M1 correspond à AF_DCMotor(1), M2 à AF_DCMotor(2), etc.',
+      ar: 'أطراف بالبراغي لتوصيل المحركات: M1 يوافق AF_DCMotor(1) وM2 يوافق AF_DCMotor(2) وهكذا.',
+    },
+  },
+  extpwr: {
+    name: { fr: 'Borne EXT_PWR', ar: 'طرف EXT_PWR' },
+    role: {
+      fr: 'Entrée d’alimentation externe des moteurs : on y branche le + et le − du pack de piles.',
+      ar: 'مدخل التغذية الخارجية للمحركات: نوصّل به + و − من علبة البطاريات.',
+    },
+  },
   icsp: {
     name: { fr: 'Connecteur ICSP', ar: 'موصّل ICSP' },
     role: {

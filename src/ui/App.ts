@@ -239,7 +239,7 @@ export class App {
   private readonly audio = new AudioEngine();
   private toneFreq = 0;
   private selectedPart: string | null = null;
-  private sensorKind: 'light' | 'distance' | 'temp' | 'servo' | 'buzzer' | null = null;
+  private sensorKind: 'light' | 'distance' | 'temp' | 'motor' | 'servo' | 'buzzer' | null = null;
   private readonly codes = Object.fromEntries(
     LESSONS.map((lesson) => [lesson.id, lesson.code]),
   ) as Record<LessonId, string>;
@@ -573,7 +573,7 @@ export class App {
       if (event.type === 'light' && this.sensorKind === 'light') this.sensorSlider.value = String(event.value);
       if (event.type === 'distance' && this.sensorKind === 'distance') this.sensorSlider.value = String(event.value);
       if (event.type === 'temp' && this.sensorKind === 'temp') this.sensorSlider.value = String(event.value);
-      if (event.type === 'tone' || event.type === 'light' || event.type === 'servo' || event.type === 'distance' || event.type === 'temp') {
+      if (event.type === 'tone' || event.type === 'light' || event.type === 'servo' || event.type === 'distance' || event.type === 'temp' || event.type === 'motor') {
         this.updateSensorUI();
       }
     });
@@ -697,6 +697,7 @@ export class App {
       light: ['lightLabel', 'lightHint'],
       distance: ['distLabel', 'distHint'],
       temp: ['tempLabel', 'tempHint'],
+      motor: ['motorLabel', 'motorHint'],
       servo: ['servoLabel', 'servoHint'],
       buzzer: ['toneLabel', 'toneHint'],
     } as const;
@@ -706,7 +707,9 @@ export class App {
         ? 'distance'
         : has('tmp36')
           ? 'temp'
-          : has('servo')
+          : has('dcmotor')
+            ? 'motor'
+            : has('servo')
           ? 'servo'
           : has('buzzer')
             ? 'buzzer'
@@ -898,6 +901,15 @@ export class App {
     if (this.sensorKind === 'light') this.sensorValue.textContent = String(board.lightValue);
     else if (this.sensorKind === 'distance') this.sensorValue.textContent = `${board.distanceCm} cm`;
     else if (this.sensorKind === 'temp') this.sensorValue.textContent = `${board.tempC} °C`;
+    else if (this.sensorKind === 'motor') {
+      const state = (id: number): string => {
+        const velocity = board.motorVelocity(id);
+        const speed = board.motors[id - 1].speed;
+        return velocity > 0 ? `▶ ${speed}` : velocity < 0 ? `◀ ${speed}` : '■';
+      };
+      const two = getLesson(this.activeId).components.includes('dcmotor2');
+      this.sensorValue.textContent = two ? `M1 ${state(1)} · M2 ${state(2)}` : `M1 ${state(1)}`;
+    }
     else if (this.sensorKind === 'servo') this.sensorValue.textContent = `${board.servoAngle}°`;
     else if (this.sensorKind === 'buzzer') {
       this.sensorValue.textContent = this.toneFreq > 0 ? `${this.toneFreq} Hz` : '—';
@@ -948,7 +960,7 @@ export class App {
   }
 
   private renderComponentsModal(): void {
-    const ids: ComponentId[] = ['led', 'resistor', 'button', 'pot', 'buzzer', 'ldr', 'servo', 'ultrasonic', 'tmp36', 'lcd', 'wires', 'motor'];
+    const ids: ComponentId[] = ['led', 'resistor', 'button', 'pot', 'buzzer', 'ldr', 'servo', 'ultrasonic', 'tmp36', 'shield', 'dcmotor', 'battery', 'lcd', 'wires'];
     this.componentGrid.replaceChildren();
 
     for (const id of ids) {
@@ -959,12 +971,18 @@ export class App {
       const photoWrap = document.createElement('div');
       photoWrap.className = 'component-photo';
 
-      const img = document.createElement('img');
-      img.src = info.photo.src;
-      img.alt = pick(this.lang, info.name);
-      img.loading = 'lazy';
-      img.decoding = 'async';
-      photoWrap.append(img);
+      const photo = info.photo;
+      if (photo) {
+        const img = document.createElement('img');
+        img.src = photo.src;
+        img.alt = pick(this.lang, info.name);
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        photoWrap.append(img);
+      } else {
+        // Pas de photo libre de droits : une pastille de la couleur du composant.
+        photoWrap.style.background = `linear-gradient(135deg, ${info.color}, #ffffff22)`;
+      }
 
       const body = document.createElement('div');
       body.className = 'component-body';
@@ -975,14 +993,16 @@ export class App {
       const role = document.createElement('p');
       role.textContent = pick(this.lang, info.role);
 
-      const credit = document.createElement('a');
-      credit.className = 'component-credit';
-      credit.href = info.photo.source;
-      credit.target = '_blank';
-      credit.rel = 'noreferrer';
-      credit.textContent = `${t(this.lang, 'photoBy')} ${info.photo.author} · ${info.photo.license}`;
-
-      body.append(title, role, credit);
+      body.append(title, role);
+      if (photo) {
+        const credit = document.createElement('a');
+        credit.className = 'component-credit';
+        credit.href = photo.source;
+        credit.target = '_blank';
+        credit.rel = 'noreferrer';
+        credit.textContent = `${t(this.lang, 'photoBy')} ${photo.author} · ${photo.license}`;
+        body.append(credit);
+      }
       card.append(photoWrap, body);
       this.componentGrid.append(card);
     }

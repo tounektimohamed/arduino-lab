@@ -1,7 +1,7 @@
 import type { Localized } from '../i18n';
 
 export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd' | 'distance' | 'thermo' | 'motor1' | 'motor2';
-export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd' | 'ultrasonic' | 'tmp36' | 'motor';
+export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd' | 'ultrasonic' | 'tmp36' | 'motor' | 'shield' | 'dcmotor' | 'dcmotor2' | 'battery';
 
 export interface ComponentPhoto {
   src: string;
@@ -14,7 +14,7 @@ export interface ComponentInfo {
   name: Localized;
   role: Localized;
   color: string;
-  photo: ComponentPhoto;
+  photo?: ComponentPhoto;
 }
 
 export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
@@ -143,6 +143,44 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       license: 'CC BY-SA 4.0',
       source: 'https://commons.wikimedia.org/wiki/File:Tower_Pro_SG90_micro_servo_motor.jpg',
     },
+  },
+  shield: {
+    name: { fr: 'Motor Shield L293D', ar: 'درع المحركات L293D' },
+    role: {
+      fr: 'Se clipse sur l’Uno : ses deux puces L293D (ponts en H) pilotent jusqu’à 4 moteurs DC sans que la carte fournisse le courant.',
+      ar: 'يُركَّب فوق Uno: شريحتا L293D (قناطر H) تقودان حتى 4 محركات تيار مستمر دون أن تمدّها اللوحة بالتيار.',
+    },
+    color: '#1d2b4a',
+  },
+  dcmotor: {
+    name: { fr: 'Moteur DC avec réducteur', ar: 'محرك تيار مستمر بعلبة تروس' },
+    role: {
+      fr: 'Tourne dans un sens ou dans l’autre selon la polarité ; sa vitesse dépend de la tension moyenne (PWM).',
+      ar: 'يدور في اتجاه أو آخر حسب القطبية، وتعتمد سرعته على الجهد المتوسط (PWM).',
+    },
+    color: '#f2c230',
+    photo: {
+      src: '/components/motor.webp',
+      author: 'Raimond Spekking',
+      license: 'CC BY-SA 4.0',
+      source: 'https://commons.wikimedia.org/wiki/File:TecTro_14165009_-_Motor_R280-6440.jpg',
+    },
+  },
+  dcmotor2: {
+    name: { fr: 'Second moteur DC', ar: 'المحرك الثاني' },
+    role: {
+      fr: 'Relié à la borne M2 : avec le premier moteur il forme les deux roues d’un robot.',
+      ar: 'موصول بالطرف M2: مع المحرك الأول يشكّلان عجلتي روبوت.',
+    },
+    color: '#f2c230',
+  },
+  battery: {
+    name: { fr: 'Pack de 4 piles AA (6 V)', ar: 'علبة 4 بطاريات AA (6 فولت)' },
+    role: {
+      fr: 'Alimentation externe sur la borne EXT_PWR : les moteurs consomment trop pour l’USB.',
+      ar: 'تغذية خارجية على الطرف EXT_PWR: فالمحركات تستهلك أكثر مما يوفّره USB.',
+    },
+    color: '#2a2d33',
   },
   tmp36: {
     name: { fr: 'Capteur de température TMP36', ar: 'حسّاس الحرارة TMP36' },
@@ -804,14 +842,11 @@ void loop() {
   {
     id: 'motor1',
     title: { fr: 'Un moteur avec le Motor Shield', ar: 'محرك واحد مع درع المحركات' },
-    tagline: {
-      fr: 'Avant, arrière et arrêt avec la bibliothèque AFMotor.',
-      ar: 'أمام وخلف وتوقف بمكتبة AFMotor.',
-    },
+    tagline: { fr: 'Avant, arrière et arrêt avec la bibliothèque AFMotor.', ar: 'أمام وخلف وتوقف بمكتبة AFMotor.' },
     duration: 15,
     level: { fr: 'Intermédiaire', ar: 'متوسط' },
     description: {
-      fr: 'Un moteur consomme trop de courant pour une broche de l’Uno : on utilise donc un Motor Shield. Il se clipe sur la carte et reçoit sa propre alimentation (EXT_PWR). Avec AF_DCMotor moteur(1) on pilote la borne M1 : setSpeed() règle la vitesse (0 à 255) et run() choisit FORWARD, BACKWARD ou RELEASE (arrêt).',
+      fr: 'Un moteur consomme trop de courant pour une broche de l’Uno : on utilise donc un Motor Shield. Il se clipse sur la carte et reçoit sa propre alimentation (EXT_PWR). Avec AF_DCMotor moteur(1) on pilote la borne M1 : setSpeed() règle la vitesse (0 à 255) et run() choisit FORWARD, BACKWARD ou RELEASE (arrêt).',
       ar: 'يستهلك المحرك تيارًا أكبر من أن يوفّره منفذ في Uno، لذلك نستخدم درع المحركات. يُركَّب فوق اللوحة ويأخذ تغذيته الخاصة (EXT_PWR). مع AF_DCMotor moteur(1) نتحكم بالطرف M1: تضبط setSpeed() السرعة (من 0 إلى 255) وتختار run() الاتجاه FORWARD أو BACKWARD أو RELEASE (توقف).',
     },
     objectives: {
@@ -830,37 +865,9 @@ void loop() {
       fr: 'Lancez le code : la roue tourne dans un sens, s’arrête, puis repart dans l’autre.',
       ar: 'شغّل الكود: تدور العجلة في اتجاه ثم تتوقف ثم تعود في الاتجاه الآخر.',
     },
-    code: `// Leçon 19 — un moteur avec le Motor Shield
-
-const int PWM = 9;
-const int DIR = 8;
-
-int vitesse = 0;
-int sens = 1;
-
-void setup() {
-  pinMode(PWM, OUTPUT);
-  pinMode(DIR, OUTPUT);
-  Serial.begin(9600);
-}
-
-void loop() {
-  if (sens == 1) {
-    digitalWrite(DIR, HIGH);
-  } else {
-    digitalWrite(DIR, LOW);
-  }
-  analogWrite(PWM, vitesse);
-  Serial.print("Vitesse : ");
-  Serial.println(vitesse);
-  vitesse += sens * 5;
-  if (vitesse >= 255) { sens = -1; vitesse = 255; }
-  if (vitesse <= 0) { sens = 1; vitesse = 0; }
-  delay(30);
-}
-`,
-    components: ['motor', 'wires'],
-    highlightPins: ['9', '8', '5V', 'GND'],
+    code: `// Leçon 19 — un moteur avec le Motor Shield\n#include <AFMotor.h>\n\nAF_DCMotor moteur(1);\n\nvoid setup() {\n  Serial.begin(9600);\n  moteur.setSpeed(200);\n}\n\nvoid loop() {\n  Serial.println(\"Avant\");\n  moteur.run(FORWARD);\n  delay(2000);\n\n  Serial.println(\"Stop\");\n  moteur.run(RELEASE);\n  delay(1000);\n\n  Serial.println(\"Arriere\");\n  moteur.run(BACKWARD);\n  delay(2000);\n\n  moteur.run(RELEASE);\n  delay(1000);\n}\n`,
+    components: ['shield', 'dcmotor', 'battery', 'wires'],
+    highlightPins: [],
   },
   {
     id: 'motor2',
@@ -888,53 +895,9 @@ void loop() {
       fr: 'Regardez le sens des deux roues : identiques pour avancer, opposés pour tourner.',
       ar: 'راقب اتجاه العجلتين: متماثل للتقدّم ومتعاكس للدوران.',
     },
-    code: `// Leçon 20 — deux moteurs : un robot
-
-const int PWM1 = 9;
-const int PWM2 = 10;
-const int DIR1 = 8;
-const int DIR2 = 11;
-
-void avancer(int vitesse) {
-  digitalWrite(DIR1, HIGH);
-  digitalWrite(DIR2, HIGH);
-  analogWrite(PWM1, vitesse);
-  analogWrite(PWM2, vitesse);
-}
-
-void tourner(int vitesse) {
-  digitalWrite(DIR1, HIGH);
-  digitalWrite(DIR2, LOW);
-  analogWrite(PWM1, vitesse);
-  analogWrite(PWM2, vitesse);
-}
-
-void stopper() {
-  analogWrite(PWM1, 0);
-  analogWrite(PWM2, 0);
-}
-
-void setup() {
-  pinMode(PWM1, OUTPUT);
-  pinMode(PWM2, OUTPUT);
-  pinMode(DIR1, OUTPUT);
-  pinMode(DIR2, OUTPUT);
-  Serial.begin(9600);
-}
-
-void loop() {
-  Serial.println("Avance");
-  avancer(200);
-  delay(2000);
-  Serial.println("Tourne");
-  tourner(180);
-  delay(800);
-  stopper();
-  delay(1000);
-}
-`,
-    components: ['motor', 'wires'],
-    highlightPins: ['9', '8', '10', '11', '5V', 'GND'],
+    code: `// Leçon 20 — deux moteurs : un robot\n#include <AFMotor.h>\n\nAF_DCMotor gauche(1);\nAF_DCMotor droite(2);\n\nvoid avancer(int vitesse) {\n  gauche.setSpeed(vitesse);\n  droite.setSpeed(vitesse);\n  gauche.run(FORWARD);\n  droite.run(FORWARD);\n}\n\nvoid tourner(int vitesse) {\n  gauche.setSpeed(vitesse);\n  droite.setSpeed(vitesse);\n  gauche.run(FORWARD);\n  droite.run(BACKWARD);\n}\n\nvoid stopper() {\n  gauche.run(RELEASE);\n  droite.run(RELEASE);\n}\n\nvoid setup() {\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  Serial.println(\"Avance\");\n  avancer(200);\n  delay(2000);\n\n  Serial.println(\"Tourne\");\n  tourner(180);\n  delay(800);\n\n  stopper();\n  delay(1000);\n}\n`,
+    components: ['shield', 'dcmotor', 'dcmotor2', 'battery', 'wires'],
+    highlightPins: [],
   },
 ];
 

@@ -73,7 +73,8 @@ export type BoardEvent =
   | { type: 'lcd'; lines: string[]; backlight: boolean }
   | { type: 'distance'; value: number }
   | { type: 'ping' }
-  | { type: 'temp'; value: number };
+  | { type: 'temp'; value: number }
+  | { type: 'motor'; id: number; velocity: number };
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -87,6 +88,8 @@ export class BoardState {
   servoAngle = 90;
   distanceCm = 30;
   tempC = 24;
+  /** Moteurs du shield (M1 à M4) : vitesse 0-255 et mode 1 FORWARD, 2 BACKWARD, 3 BRAKE, 4 RELEASE. */
+  motors = Array.from({ length: 4 }, () => ({ speed: 0, mode: 4 }));
   /** A1 lit soit la photorésistance (leçons lumière), soit la sonde TMP36 (leçon thermomètre). */
   private sensorOnA1: 'light' | 'temp' = 'light';
   private toneTimer: number | null = null;
@@ -128,6 +131,11 @@ export class BoardState {
     this.emit({ type: 'servo', pin: 10, angle: 90 });
     this.emit({ type: 'distance', value: this.distanceCm });
     this.emit({ type: 'temp', value: this.tempC });
+    this.motors.forEach((motor, index) => {
+      motor.speed = 0;
+      motor.mode = 4;
+      this.emitMotor(index + 1);
+    });
     this.emitLcd();
     this.emit({ type: 'tone', pin: 8, freq: 0 });
   }
@@ -256,6 +264,33 @@ export class BoardState {
     this.emit({ type: 'ping' });
     if (state !== 1 || this.distanceCm < 2 || this.distanceCm > 400) return 0;
     return Math.round(this.distanceCm * 58.2);
+  }
+
+  motorSetSpeed(id: number, speed: number): void {
+    const motor = this.motors[id - 1];
+    if (!motor) return;
+    motor.speed = Math.round(clamp(speed, 0, 255));
+    this.emitMotor(id);
+  }
+
+  motorRun(id: number, mode: number): void {
+    const motor = this.motors[id - 1];
+    if (!motor) return;
+    motor.mode = mode;
+    this.emitMotor(id);
+  }
+
+  /** Vitesse normalisée de -1 (arrière à fond) à +1 (avant à fond). */
+  motorVelocity(id: number): number {
+    const motor = this.motors[id - 1];
+    if (!motor) return 0;
+    if (motor.mode === 1) return motor.speed / 255;
+    if (motor.mode === 2) return -motor.speed / 255;
+    return 0;
+  }
+
+  private emitMotor(id: number): void {
+    this.emit({ type: 'motor', id, velocity: this.motorVelocity(id) });
   }
 
   setDistance(cm: number): void {

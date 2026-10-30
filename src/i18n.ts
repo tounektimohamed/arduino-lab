@@ -127,6 +127,11 @@ export const ui = {
     fr: 'Réglez la température vue par la sonde TMP36 (−10 à 50 °C).',
     ar: 'اضبط الحرارة التي يقيسها الحسّاس TMP36 (من −10 إلى 50 °م).',
   },
+  motorLabel: { fr: 'Moteurs du shield', ar: 'محركات الدرع' },
+  motorHint: {
+    fr: '▶ avant · ◀ arrière · ■ arrêt, avec la vitesse (0 à 255).',
+    ar: '▶ أمام · ◀ خلف · ■ توقف، مع السرعة (من 0 إلى 255).',
+  },
   partKicker: { fr: 'Composant', ar: 'مكوّن' },
   partHint: { fr: 'Cliquez sur une pièce de la carte', ar: 'انقر على أي قطعة من اللوحة' },
   progress: { fr: 'progression', ar: 'التقدّم' },

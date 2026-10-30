@@ -35,6 +35,8 @@ export interface ArduinoRuntime {
   lcdPrint(text: string, newline?: boolean): void;
   lcdBacklight(on: boolean): void;
   pulseIn(pin: number, state: number): number;
+  motorSetSpeed(id: number, speed: number): void;
+  motorRun(id: number, mode: number): void;
 }
 
 type TokenType = 'num' | 'str' | 'id' | 'op' | 'eof';
@@ -60,6 +62,7 @@ type Stmt =
   | { type: 'block'; body: Stmt[] }
   | { type: 'decl'; decls: { name: string; init: Expr | null }[] }
   | { type: 'lcd'; name: string; args: Expr[] }
+  | { type: 'motor'; name: string; args: Expr[] }
   | { type: 'expr'; expr: Expr }
   | { type: 'if'; cond: Expr; then: Stmt; otherwise?: Stmt }
   | { type: 'while'; cond: Expr; body: Stmt }
@@ -95,6 +98,7 @@ const TYPE_WORDS = new Set([
   'String',
   'Servo',
   'LiquidCrystal_I2C',
+  'AF_DCMotor',
   'auto',
 ]);
 const MODIFIERS = new Set(['const', 'static', 'volatile']);
@@ -117,6 +121,10 @@ const CONSTANTS = new Map<string, Value>([
   ['NOTE_A4', 440],
   ['NOTE_B4', 494],
   ['NOTE_C5', 523],
+  ['FORWARD', 1],
+  ['BACKWARD', 2],
+  ['BRAKE', 3],
+  ['RELEASE', 4],
   ['A0', 14],
   ['A1', 15],
   ['A2', 16],
@@ -233,8 +241,12 @@ class Parser {
         while (this.peek().type === 'id' && MODIFIERS.has(this.peek().value)) this.next();
         if (this.peek().type === 'id' && TYPE_WORDS.has(this.peek().value)) {
           const typeName = this.next().value;
-          if (typeName === 'LiquidCrystal_I2C' && this.peek().type === 'id' && this.peek(1).value === '(') {
-            // LiquidCrystal_I2C lcd(0x27, 16, 2);
+          if (
+            (typeName === 'LiquidCrystal_I2C' || typeName === 'AF_DCMotor') &&
+            this.peek().type === 'id' &&
+            this.peek(1).value === '('
+          ) {
+            // LiquidCrystal_I2C lcd(0x27, 16, 2);   AF_DCMotor moteur(1);
             const name = this.next().value;
             this.expect('(');
             const args: Expr[] = [];
@@ -245,7 +257,7 @@ class Parser {
             }
             this.expect(')');
             this.expect(';');
-            globals.push({ type: 'lcd', name, args });
+            globals.push({ type: typeName === 'AF_DCMotor' ? 'motor' : 'lcd', name, args });
             continue;
           }
           if (this.peek().type === 'id' && this.peek(1).value === '(') {
@@ -646,6 +658,7 @@ class Executor {
   private callDepth = 0;
   private servos = new Map<string, number>();
   private lcds = new Map<string, { address: number; columns: number; rows: number }>();
+  private motors = new Map<string, number>();
 
   constructor(
     private program: ParsedProgram,
@@ -704,6 +717,11 @@ class Executor {
           scope.set(declaration.name, value);
         }
         return;
+      case 'motor': {
+        const values = await Promise.all(stmt.args.map((arg) => this.evaluate(arg, scope)));
+        this.motors.set(stmt.name, toNumber(values[0] ?? 1));
+        return;
+      }
       case 'lcd': {
         const values = await Promise.all(stmt.args.map((arg) => this.evaluate(arg, scope)));
         this.lcds.set(stmt.name, {
@@ -833,6 +851,19 @@ class Executor {
       if (member.object.type === 'id') {
         const name = member.object.name;
         const num = (index: number): number => toNumber(args[index] ?? 0);
+        const motorId = this.motors.get(name);
+        if (motorId !== undefined) {
+          switch (member.property) {
+            case 'setSpeed':
+              this.runtime.motorSetSpeed(motorId, num(0));
+              return 0;
+            case 'run':
+              this.runtime.motorRun(motorId, num(0));
+              return 0;
+            default:
+              throw new ProgramError(`moteur.${member.property}() n'est pas supporté.`);
+          }
+        }
         const lcd = this.lcds.get(name);
         if (lcd) {
           switch (member.property) {
