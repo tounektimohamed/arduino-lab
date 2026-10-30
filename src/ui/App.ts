@@ -215,7 +215,7 @@ export class App {
   private readonly audio = new AudioEngine();
   private toneFreq = 0;
   private selectedPart: string | null = null;
-  private sensorKind: 'light' | 'distance' | 'servo' | 'buzzer' | null = null;
+  private sensorKind: 'light' | 'distance' | 'temp' | 'servo' | 'buzzer' | null = null;
   private readonly codes = Object.fromEntries(
     LESSONS.map((lesson) => [lesson.id, lesson.code]),
   ) as Record<LessonId, string>;
@@ -449,6 +449,7 @@ export class App {
     this.sensorSlider.addEventListener('input', () => {
       const value = Number(this.sensorSlider.value);
       if (this.sensorKind === 'distance') this.sim.board.setDistance(value);
+      else if (this.sensorKind === 'temp') this.sim.board.setTemperature(value);
       else this.sim.board.setLight(value);
     });
     this.soundToggle.addEventListener('click', () => {
@@ -501,7 +502,8 @@ export class App {
       }
       if (event.type === 'light' && this.sensorKind === 'light') this.sensorSlider.value = String(event.value);
       if (event.type === 'distance' && this.sensorKind === 'distance') this.sensorSlider.value = String(event.value);
-      if (event.type === 'tone' || event.type === 'light' || event.type === 'servo' || event.type === 'distance') {
+      if (event.type === 'temp' && this.sensorKind === 'temp') this.sensorSlider.value = String(event.value);
+      if (event.type === 'tone' || event.type === 'light' || event.type === 'servo' || event.type === 'distance' || event.type === 'temp') {
         this.updateSensorUI();
       }
     });
@@ -623,6 +625,7 @@ export class App {
     const sensors = {
       light: ['lightLabel', 'lightHint'],
       distance: ['distLabel', 'distHint'],
+      temp: ['tempLabel', 'tempHint'],
       servo: ['servoLabel', 'servoHint'],
       buzzer: ['toneLabel', 'toneHint'],
     } as const;
@@ -630,18 +633,30 @@ export class App {
       ? 'light'
       : has('ultrasonic')
         ? 'distance'
-        : has('servo')
+        : has('tmp36')
+          ? 'temp'
+          : has('servo')
           ? 'servo'
           : has('buzzer')
             ? 'buzzer'
             : null;
     const sensor = this.sensorKind ? sensors[this.sensorKind] : null;
     this.sensorControl.hidden = sensor === null;
-    this.sensorSlider.hidden = this.sensorKind !== 'light' && this.sensorKind !== 'distance';
-    const isDistance = this.sensorKind === 'distance';
-    this.sensorSlider.min = isDistance ? '2' : '0';
-    this.sensorSlider.max = isDistance ? '60' : '1023';
-    this.sensorSlider.value = String(isDistance ? this.sim.board.distanceCm : this.sim.board.lightValue);
+    const slider = {
+      light: { min: 0, max: 1023, value: this.sim.board.lightValue },
+      distance: { min: 2, max: 60, value: this.sim.board.distanceCm },
+      temp: { min: -10, max: 50, value: this.sim.board.tempC },
+    } as const;
+    const range = this.sensorKind === 'light' || this.sensorKind === 'distance' || this.sensorKind === 'temp' ? slider[this.sensorKind] : null;
+    this.sensorSlider.hidden = range === null;
+    if (range) {
+      this.sensorSlider.min = String(range.min);
+      this.sensorSlider.max = String(range.max);
+      this.sensorSlider.value = String(range.value);
+      // A1 lit la photorésistance ou la sonde TMP36 selon la leçon : on « branche » la bonne.
+      if (this.sensorKind === 'temp') this.sim.board.setTemperature(this.sim.board.tempC);
+      if (this.sensorKind === 'light') this.sim.board.setLight(this.sim.board.lightValue);
+    }
     this.soundToggle.hidden = !has('buzzer');
     if (sensor) {
       this.sensorLabel.textContent = t(this.lang, sensor[0]);
@@ -745,6 +760,7 @@ export class App {
     const board = this.sim.board;
     if (this.sensorKind === 'light') this.sensorValue.textContent = String(board.lightValue);
     else if (this.sensorKind === 'distance') this.sensorValue.textContent = `${board.distanceCm} cm`;
+    else if (this.sensorKind === 'temp') this.sensorValue.textContent = `${board.tempC} °C`;
     else if (this.sensorKind === 'servo') this.sensorValue.textContent = `${board.servoAngle}°`;
     else if (this.sensorKind === 'buzzer') {
       this.sensorValue.textContent = this.toneFreq > 0 ? `${this.toneFreq} Hz` : '—';
@@ -795,7 +811,7 @@ export class App {
   }
 
   private renderComponentsModal(): void {
-    const ids: ComponentId[] = ['led', 'resistor', 'button', 'pot', 'buzzer', 'ldr', 'servo', 'ultrasonic', 'lcd', 'wires'];
+    const ids: ComponentId[] = ['led', 'resistor', 'button', 'pot', 'buzzer', 'ldr', 'servo', 'ultrasonic', 'tmp36', 'lcd', 'wires'];
     this.componentGrid.replaceChildren();
 
     for (const id of ids) {

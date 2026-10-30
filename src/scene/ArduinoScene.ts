@@ -109,6 +109,9 @@ export class ArduinoScene {
   private readonly lcdGroup = new THREE.Group();
   private readonly lcdWires = new THREE.Group();
   private readonly ultraGroup = new THREE.Group();
+  private readonly tmpGroup = new THREE.Group();
+  private readonly tmpWires = new THREE.Group();
+  private tmpHalo!: THREE.Mesh;
   private readonly ultraWires = new THREE.Group();
   private readonly ballGroup = new THREE.Group();
   private readonly pingRings: THREE.Mesh[] = [];
@@ -224,6 +227,8 @@ export class ArduinoScene {
     this.lcdWires.visible = has('lcd');
     this.ultraGroup.visible = has('ultrasonic');
     this.ultraWires.visible = has('ultrasonic');
+    this.tmpGroup.visible = has('tmp36');
+    this.tmpWires.visible = has('tmp36');
     this.ballGroup.visible = has('ultrasonic');
     const nextTarget = this.viewTarget();
     this.camera.position.add(nextTarget.clone().sub(this.controls.target));
@@ -705,6 +710,7 @@ export class ArduinoScene {
     this.buildServo();
     this.buildLcd();
     this.buildUltrasonic();
+    this.buildTmp();
   }
 
   private buildLed(): void {
@@ -1243,6 +1249,58 @@ export class ArduinoScene {
     this.ballGroup.position.z = 1.05 + 0.4 + cm * 0.08;
   }
 
+  /**
+   * TMP36 planté dans la platine : 3 pattes = 3 colonnes distinctes (20, 21, 22) en rangée 6.
+   * Les fils (5V, A1, GND) arrivent dans les mêmes colonnes, rangée 9, par l'avant.
+   * Un halo coloré (bleu → rouge) montre la température mesurée.
+   */
+  private buildTmp(): void {
+    this.tmpGroup.position.set(holeX(21), BREADBOARD.h, holeZ(6));
+
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.42, 20), std(0x1c1c20, { roughness: 0.5 }));
+    body.scale.z = 0.8;
+    body.position.y = 0.51;
+    body.castShadow = true;
+    this.tmpGroup.add(body);
+
+    const label = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.28, 0.01), std(0xe9e6df, { roughness: 0.6 }));
+    label.position.set(0, 0.51, 0.162);
+    this.tmpGroup.add(label);
+
+    const legMat = std(0xc9c9c9, { metalness: 0.7, roughness: 0.3 });
+    for (const dx of [-0.27, 0, 0.27]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.3, 8), legMat);
+      leg.position.set(dx, 0.15, 0);
+      this.tmpGroup.add(leg);
+    }
+
+    this.tmpHalo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.55, 24, 16),
+      new THREE.MeshBasicMaterial({ color: 0x4aa3ff, transparent: true, opacity: 0.3, depthWrite: false }),
+    );
+    this.tmpHalo.position.y = 0.55;
+    this.tmpGroup.add(this.tmpHalo);
+
+    this.tmpGroup.visible = false;
+    this.registerPart(this.tmpGroup, 'tmp36');
+    this.scene.add(this.tmpGroup);
+    this.setTempVisual(this.board.tempC);
+
+    const v = (p: { x: number; y: number; z: number }): THREE.Vector3 => vec(p.x, p.y, p.z);
+    this.tmpWires.add(
+      wireMesh(lanePoints(v(pinWorld('5V')), vec(holeX(20), 1.02, holeZ(9)), 3.35, 1.35), COLORS.red),
+      wireMesh(lanePoints(v(pinWorld('A1')), vec(holeX(21), 1.02, holeZ(9)), 3.55, 1.55), 0x8a5ad6),
+      wireMesh(lanePoints(v(POWER_GND), vec(holeX(22), 1.02, holeZ(9)), 3.15, 1.15), COLORS.black),
+    );
+    this.tmpWires.visible = false;
+    this.scene.add(this.tmpWires);
+  }
+
+  private setTempVisual(celsius: number): void {
+    const t = (celsius + 10) / 60;
+    (this.tmpHalo.material as THREE.MeshBasicMaterial).color.setHSL(0.6 - t * 0.6, 0.85, 0.5);
+  }
+
   private buildExtraWires(): void {
     const v = (p: { x: number; y: number; z: number }): THREE.Vector3 => vec(p.x, p.y, p.z);
     const p8 = v(pinWorld('8'));
@@ -1593,6 +1651,9 @@ export class ArduinoScene {
         break;
       case 'ping':
         this.pingUntil = this.lastTime + 0.4;
+        break;
+      case 'temp':
+        this.setTempVisual(event.value);
         break;
     }
   };

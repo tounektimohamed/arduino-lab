@@ -1,7 +1,7 @@
 import type { Localized } from '../i18n';
 
-export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd' | 'distance';
-export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd' | 'ultrasonic';
+export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd' | 'distance' | 'thermo';
+export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd' | 'ultrasonic' | 'tmp36';
 
 export interface ComponentInfo {
   name: Localized;
@@ -73,6 +73,14 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'يدور إلى زاوية دقيقة من 0° إلى 180° حسب الأمر.',
     },
     color: '#3b6fb6',
+  },
+  tmp36: {
+    name: { fr: 'Capteur de température TMP36', ar: 'حسّاس الحرارة TMP36' },
+    role: {
+      fr: 'Sa tension de sortie vaut 0,5 V à 0 °C et augmente de 10 mV par degré : on la lit avec analogRead().',
+      ar: 'جهد خرجه 0.5 فولت عند 0 °م ويزداد 10 ميلي فولت لكل درجة: نقرؤه بـ analogRead().',
+    },
+    color: '#1c1c20',
   },
   ultrasonic: {
     name: { fr: 'Capteur à ultrasons HC-SR04', ar: 'حسّاس الموجات فوق الصوتية HC-SR04' },
@@ -674,6 +682,36 @@ void loop() {
     code: `// Leçon 17 — radar de distance\n#include <Wire.h>\n#include <LiquidCrystal_I2C.h>\n\nLiquidCrystal_I2C lcd(0x27, 16, 2);\n\nconst int TRIG = A2;\nconst int ECHO = A3;\n\nvoid setup() {\n  pinMode(TRIG, OUTPUT);\n  pinMode(ECHO, INPUT);\n  lcd.init();\n  lcd.backlight();\n}\n\nvoid loop() {\n  digitalWrite(TRIG, LOW);\n  delayMicroseconds(2);\n  digitalWrite(TRIG, HIGH);\n  delayMicroseconds(10);\n  digitalWrite(TRIG, LOW);\n\n  int duree = pulseIn(ECHO, HIGH);\n  int distance = round(duree / 58.0);\n\n  lcd.setCursor(0, 0);\n  lcd.print(\"Distance :\");\n  lcd.setCursor(0, 1);\n  lcd.print(distance);\n  lcd.print(\" cm   \");\n\n  delay(200);\n}\n`,
     components: ['ultrasonic', 'lcd', 'wires'],
     highlightPins: ['A2', 'A3', 'A4', 'A5', '5V', 'GND-F'],
+  },
+  {
+    id: 'thermo',
+    title: { fr: 'Station de température', ar: 'محطة قياس الحرارة' },
+    tagline: { fr: 'Projet complet : sonde TMP36, écran LCD, LED et alarme buzzer.', ar: 'مشروع كامل: حسّاس TMP36 وشاشة LCD ومصباح وإنذار بالجرس.' },
+    duration: 20,
+    level: { fr: 'Avancé', ar: 'متقدم' },
+    description: {
+      fr: 'La sonde TMP36 donne une tension proportionnelle à la température : 0,5 V à 0 °C, plus 10 mV par degré. analogRead() la mesure de 0 à 1023, on la convertit en volts (× 5 ÷ 1023) puis en degrés ((V − 0,5) × 100). Le résultat s’affiche sur le LCD ; au-delà du seuil, la LED s’allume et le buzzer sonne. Réglez la température avec le curseur.',
+      ar: 'يعطي الحسّاس TMP36 جهدًا يتناسب مع الحرارة: 0.5 فولت عند 0 °م زائد 10 ميلي فولت لكل درجة. يقيسه analogRead() من 0 إلى 1023 ونحوّله إلى فولت (× 5 ÷ 1023) ثم إلى درجات ((V − 0.5) × 100). تُعرض النتيجة على LCD، وعند تجاوز العتبة يُضاء المصباح ويدقّ الجرس. اضبط الحرارة بالمنزلق.',
+    },
+    objectives: {
+      fr: ['Convertir une mesure analogique en volts puis en °C.', 'Afficher une valeur sur le LCD.', 'Déclencher une alarme (LED + buzzer) au-delà d’un seuil.'],
+      ar: ['تحويل قياس تماثلي إلى فولت ثم إلى °م.', 'عرض قيمة على شاشة LCD.', 'تشغيل إنذار (مصباح + جرس) عند تجاوز عتبة.'],
+    },
+    wiring: {
+      fr: ['TMP36 : patte gauche → 5V, patte centrale → A1, patte droite → GND.', 'LCD I2C : VCC → 5V, GND → GND, SDA → A4, SCL → A5.', 'Buzzer : broche 8 (+) et GND (−) ; LED : broche 9 via la résistance.'],
+      ar: ['TMP36: الساق اليسرى ← 5V، والوسطى ← A1، واليمنى ← GND.', 'شاشة LCD I2C: ‏VCC ← 5V، وGND ← GND، وSDA ← A4، وSCL ← A5.', 'الجرس: المنفذ 8 (+) وGND (−)؛ المصباح: المنفذ 9 عبر المقاومة.'],
+    },
+    challenge: {
+      fr: 'Ajoutez un deuxième seuil : la LED s’allume dès 25 °C, le buzzer seulement à 30 °C.',
+      ar: 'أضف عتبة ثانية: يُضاء المصباح من 25 °م ويدقّ الجرس عند 30 °م فقط.',
+    },
+    hint: {
+      fr: 'Lancez le code puis montez le curseur de température au-dessus de 30 °C.',
+      ar: 'شغّل الكود ثم ارفع منزلق الحرارة فوق 30 °م.',
+    },
+    code: `// Leçon 18 — station de température\n#include <Wire.h>\n#include <LiquidCrystal_I2C.h>\n\nLiquidCrystal_I2C lcd(0x27, 16, 2);\n\nconst int SONDE = A1;\nconst int BUZZER = 8;\nconst int LED = 9;\nconst int SEUIL = 30;\n\nvoid setup() {\n  pinMode(BUZZER, OUTPUT);\n  pinMode(LED, OUTPUT);\n  lcd.init();\n  lcd.backlight();\n}\n\nvoid loop() {\n  int mesure = analogRead(SONDE);\n  float tension = mesure * 5.0 / 1023.0;\n  int temperature = round((tension - 0.5) * 100.0);\n\n  lcd.setCursor(0, 0);\n  lcd.print(\"Temperature :\");\n  lcd.setCursor(0, 1);\n  lcd.print(temperature);\n  lcd.print(\" C   \");\n\n  if (temperature >= SEUIL) {\n    digitalWrite(LED, HIGH);\n    tone(BUZZER, 880, 150);\n  } else {\n    digitalWrite(LED, LOW);\n    noTone(BUZZER);\n  }\n\n  delay(300);\n}\n`,
+    components: ['tmp36', 'lcd', 'buzzer', 'led', 'resistor', 'wires'],
+    highlightPins: ['A1', 'A4', 'A5', '5V', 'GND-F', '8', '9', 'GND'],
   },
 ];
 

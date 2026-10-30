@@ -72,7 +72,8 @@ export type BoardEvent =
   | { type: 'light'; value: number }
   | { type: 'lcd'; lines: string[]; backlight: boolean }
   | { type: 'distance'; value: number }
-  | { type: 'ping' };
+  | { type: 'ping' }
+  | { type: 'temp'; value: number };
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -85,6 +86,9 @@ export class BoardState {
   lightValue = 650;
   servoAngle = 90;
   distanceCm = 30;
+  tempC = 24;
+  /** A1 lit soit la photorésistance (leçons lumière), soit la sonde TMP36 (leçon thermomètre). */
+  private sensorOnA1: 'light' | 'temp' = 'light';
   private toneTimer: number | null = null;
   private lcdBuffer: string[][] = [];
   lcdColumns = 16;
@@ -123,6 +127,7 @@ export class BoardState {
     this.emit({ type: 'light', value: this.lightValue });
     this.emit({ type: 'servo', pin: 10, angle: 90 });
     this.emit({ type: 'distance', value: this.distanceCm });
+    this.emit({ type: 'temp', value: this.tempC });
     this.emitLcd();
     this.emit({ type: 'tone', pin: 8, freq: 0 });
   }
@@ -155,7 +160,7 @@ export class BoardState {
 
   analogRead(pin: number): number {
     if (pin === 0 || pin === 14) return this.potValue;
-    if (pin === 1 || pin === 15) return this.lightValue;
+    if (pin === 1 || pin === 15) return this.sensorOnA1 === 'temp' ? this.tempAdc() : this.lightValue;
     return 0;
   }
 
@@ -265,7 +270,21 @@ export class BoardState {
     this.emit({ type: 'servo', pin, angle: this.servoAngle });
   }
 
+  /** TMP36 : 0,5 V à 0 °C + 10 mV par °C, converti sur 10 bits (5 V = 1023). */
+  private tempAdc(): number {
+    return Math.round(((this.tempC / 100 + 0.5) / 5) * 1023);
+  }
+
+  setTemperature(celsius: number): void {
+    this.sensorOnA1 = 'temp';
+    const next = Math.round(clamp(celsius, -10, 50));
+    if (next === this.tempC) return;
+    this.tempC = next;
+    this.emit({ type: 'temp', value: next });
+  }
+
   setLight(value: number): void {
+    this.sensorOnA1 = 'light';
     const next = Math.round(clamp(value, 0, 1023));
     if (next === this.lightValue) return;
     this.lightValue = next;

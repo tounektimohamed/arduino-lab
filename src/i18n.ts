@@ -115,6 +115,11 @@ export const ui = {
     fr: 'Faites glisser la balle dans la scène, ou ce curseur.',
     ar: 'اسحب الكرة في المشهد أو هذا المنزلق.',
   },
+  tempLabel: { fr: 'Température ambiante', ar: 'درجة الحرارة المحيطة' },
+  tempHint: {
+    fr: 'Réglez la température vue par la sonde TMP36 (−10 à 50 °C).',
+    ar: 'اضبط الحرارة التي يقيسها الحسّاس TMP36 (من −10 إلى 50 °م).',
+  },
   partKicker: { fr: 'Composant', ar: 'مكوّن' },
   partHint: { fr: 'Cliquez sur une pièce de la carte', ar: 'انقر على أي قطعة من اللوحة' },
   progress: { fr: 'progression', ar: 'التقدّم' },
