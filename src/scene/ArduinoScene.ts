@@ -106,9 +106,13 @@ export class ArduinoScene {
   private readonly ldrWires = new THREE.Group();
   private readonly servoGroup = new THREE.Group();
   private readonly servoWires = new THREE.Group();
+  private readonly lcdGroup = new THREE.Group();
+  private readonly lcdWires = new THREE.Group();
   private readonly lamp = new THREE.Group();
   private readonly partKeys = new Map<THREE.Object3D, string>();
   private selection: THREE.BoxHelper | null = null;
+  private strip: THREE.Mesh | null = null;
+  private breadboardBase!: THREE.Mesh;
   private downX = 0;
   private downY = 0;
   private activeComponents: string[] = [];
@@ -205,6 +209,8 @@ export class ArduinoScene {
     this.ldrWires.visible = has('ldr');
     this.servoGroup.visible = has('servo');
     this.servoWires.visible = has('servo');
+    this.lcdGroup.visible = has('lcd');
+    this.lcdWires.visible = has('lcd');
     const nextTarget = this.viewTarget();
     this.camera.position.add(nextTarget.clone().sub(this.controls.target));
     this.controls.target.copy(nextTarget);
@@ -544,7 +550,8 @@ export class ArduinoScene {
       this.selection.geometry.dispose();
       this.selection = null;
     }
-    if (key) {
+    if (!key || !key.startsWith('breadboard')) this.clearStrip();
+    if (key && !key.startsWith('breadboard')) {
       const root = [...this.partKeys.entries()].find(
         ([object, k]) => k === key && this.isVisible(object),
       )?.[0];
@@ -565,6 +572,55 @@ export class ArduinoScene {
     this.selectPart(null);
   }
 
+  private clearStrip(): void {
+    if (!this.strip) return;
+    this.scene.remove(this.strip);
+    this.strip.geometry.dispose();
+    this.strip = null;
+  }
+
+  /** Surligne les trous reliés entre eux : une demi-colonne de 5 trous, ou un rail entier. */
+  private pickBreadboardNode(): string {
+    const hit = this.raycaster.intersectObject(this.breadboardBase)[0];
+    if (!hit) return 'breadboard';
+    const { x, z } = hit.point;
+
+    let width: number;
+    let depth: number;
+    let cx: number;
+    let cz: number;
+    let key: string;
+
+    const rail = RAIL_Z.findIndex((railZ) => Math.abs(z - railZ) < 0.12);
+    if (rail >= 0) {
+      width = railHoleX(24) - railHoleX(0) + 0.3;
+      depth = 0.2;
+      cx = BREADBOARD.x;
+      cz = RAIL_Z[rail];
+      key = 'breadboardRail';
+    } else if (z > holeZ(0) - 0.2 && z < holeZ(9) + 0.2) {
+      const col = Math.min(HOLES.cols - 1, Math.max(0, Math.round((x - BREADBOARD.x) / HOLES.spacing + (HOLES.cols - 1) / 2)));
+      const upper = z < BREADBOARD.z;
+      const first = upper ? 0 : 5;
+      width = 0.2;
+      depth = holeZ(first + 4) - holeZ(first) + 0.24;
+      cx = holeX(col);
+      cz = (holeZ(first) + holeZ(first + 4)) / 2;
+      key = 'breadboardColumn';
+    } else {
+      return 'breadboard';
+    }
+
+    this.strip = new THREE.Mesh(
+      new THREE.BoxGeometry(width, 0.04, depth),
+      new THREE.MeshBasicMaterial({ color: 0xf2a93b, transparent: true, opacity: 0.55, depthTest: false }),
+    );
+    this.strip.position.set(cx, BREADBOARD.h + 0.03, cz);
+    this.strip.renderOrder = 9;
+    this.scene.add(this.strip);
+    return key;
+  }
+
   private buildBreadboard(): void {
     const base = new THREE.Mesh(
       new RoundedBoxGeometry(BREADBOARD.w, BREADBOARD.h, BREADBOARD.d, 3, 0.1),
@@ -575,6 +631,7 @@ export class ArduinoScene {
     base.receiveShadow = true;
     this.scene.add(base);
     this.registerPart(base, 'breadboard');
+    this.breadboardBase = base;
 
     const top = new THREE.Mesh(
       new THREE.PlaneGeometry(BREADBOARD.w, BREADBOARD.d),
@@ -631,6 +688,7 @@ export class ArduinoScene {
     this.buildBuzzer();
     this.buildLdr();
     this.buildServo();
+    this.buildLcd();
   }
 
   private buildLed(): void {
@@ -993,6 +1051,38 @@ export class ArduinoScene {
     this.scene.add(this.servoGroup);
   }
 
+  private buildLcd(): void {
+    this.lcdGroup.position.set(holeX(18), BREADBOARD.h, holeZ(9));
+
+    const bezel = new THREE.Mesh(
+      new THREE.BoxGeometry(1.9, 0.16, 1.1),
+      std(0x15181c, { roughness: 0.5 }),
+    );
+    bezel.position.y = 0.08;
+    bezel.castShadow = true;
+    bezel.receiveShadow = true;
+    this.lcdGroup.add(bezel);
+
+    const screen = new THREE.Mesh(
+      new THREE.BoxGeometry(1.7, 0.1, 0.9),
+      new THREE.MeshStandardMaterial({
+        color: 0x0d1b2a,
+        emissive: 0x8fd3ff,
+        emissiveIntensity: this.board.lcdBacklightOn ? 0.35 : 0,
+        roughness: 0.35,
+        metalness: 0.2,
+      }),
+    );
+    screen.position.y = 0.12;
+    screen.castShadow = true;
+    screen.receiveShadow = true;
+    this.lcdGroup.add(screen);
+
+    this.registerPart(this.lcdGroup, 'lcd');
+    this.scene.add(this.lcdGroup);
+    this.lcdGroup.visible = false;
+  }
+
   private buildExtraWires(): void {
     const v = (p: { x: number; y: number; z: number }): THREE.Vector3 => vec(p.x, p.y, p.z);
     const p8 = v(pinWorld('8'));
@@ -1003,16 +1093,16 @@ export class ArduinoScene {
     const p10 = v(pinWorld('10'));
 
     this.buzzerWires.add(
-      wireMesh(lanePoints(p8, vec(holeX(20), 0.95, holeZ(3)), -3.85, 1.55), COLORS.blue),
-      wireMesh(archPoints(gndBack, vec(holeX(23), 0.95, holeZ(3)), 1.2), COLORS.black),
+      wireMesh(lanePoints(p8, vec(holeX(20), 0.95, holeZ(0)), -3.85, 1.55), COLORS.blue),
+      wireMesh(archPoints(gndBack, vec(holeX(23), 0.95, holeZ(0)), 1.2), COLORS.black),
     );
     this.buzzerWires.visible = false;
     this.scene.add(this.buzzerWires);
 
     this.ldrWires.add(
-      wireMesh(lanePoints(v5, vec(holeX(20), 1.02, holeZ(7)), 3.35, 1.35), COLORS.red),
-      wireMesh(lanePoints(a1, vec(holeX(22), 1.02, holeZ(7)), 3.55, 1.55), 0x8a5ad6),
-      wireMesh(lanePoints(gndFront, vec(holeX(25), 1.02, holeZ(7)), 3.15, 1.15), COLORS.black),
+      wireMesh(lanePoints(v5, vec(holeX(20), 1.02, holeZ(9)), 3.35, 1.35), COLORS.red),
+      wireMesh(lanePoints(a1, vec(holeX(22), 1.02, holeZ(9)), 3.55, 1.55), 0x8a5ad6),
+      wireMesh(lanePoints(gndFront, vec(holeX(25), 1.02, holeZ(9)), 3.15, 1.15), COLORS.black),
     );
     this.ldrWires.visible = false;
     this.scene.add(this.ldrWires);
@@ -1042,21 +1132,20 @@ export class ArduinoScene {
     const a0 = pinWorld('A0');
     const v5 = pinWorld('5V');
 
-    const rLeft = vec(COMPONENT_LAYOUT.resistor.left.x, 1.1, COMPONENT_LAYOUT.resistor.left.z);
-    const rRight = vec(COMPONENT_LAYOUT.resistor.right.x, 1.1, COMPONENT_LAYOUT.resistor.right.z);
-    const ledAnode = vec(COMPONENT_LAYOUT.led.anode.x, 1.15, COMPONENT_LAYOUT.led.anode.z);
-    const ledCathode = vec(COMPONENT_LAYOUT.led.cathode.x, 1.15, COMPONENT_LAYOUT.led.cathode.z);
-    const btnA = vec(COMPONENT_LAYOUT.button.a.x, 0.95, COMPONENT_LAYOUT.button.a.z);
-    const btnB = vec(COMPONENT_LAYOUT.button.b.x, 0.95, COMPONENT_LAYOUT.button.b.z);
-    const potL = vec(COMPONENT_LAYOUT.pot.left.x, 1.02, COMPONENT_LAYOUT.pot.left.z);
-    const potM = vec(COMPONENT_LAYOUT.pot.middle.x, 1.02, COMPONENT_LAYOUT.pot.middle.z);
-    const potR = vec(COMPONENT_LAYOUT.pot.right.x, 1.02, COMPONENT_LAYOUT.pot.right.z);
+    const btnA = vec(holeX(16), 0.95, holeZ(0));
+    const btnB = vec(holeX(17), 0.95, holeZ(9));
+    const potL = vec(holeX(20), 1.02, holeZ(9));
+    const potM = vec(holeX(21), 1.02, holeZ(9));
+    const potR = vec(holeX(22), 1.02, holeZ(9));
 
+    const p9v = vec(p9.x, p9.y, p9.z);
+    const gndv = vec(gnd.x, gnd.y, gnd.z);
+    // Les fils arrivent dans la rangée 0 de la même colonne que la patte du composant :
+    // le courant circule dans la colonne (5 trous reliés), jamais à travers le composant.
     const base = new THREE.Group();
     base.add(
-      wireMesh(archPoints(vec(p9.x, p9.y, p9.z), rLeft, 1.25), COLORS.green),
-      wireMesh(archPoints(rRight, ledAnode, 0.55), COLORS.green),
-      wireMesh(archPoints(ledCathode, vec(gnd.x, gnd.y, gnd.z), 1.05), COLORS.black),
+      wireMesh(archPoints(p9v, vec(holeX(8), 1.0, holeZ(0)), 1.25), COLORS.green),
+      wireMesh(archPoints(gndv, vec(holeX(12), 1.0, holeZ(0)), 1.05), COLORS.black),
     );
     this.scene.add(base);
 
@@ -1072,7 +1161,7 @@ export class ArduinoScene {
         ],
         COLORS.blue,
       ),
-      wireMesh(archPoints(vec(gnd.x, gnd.y, gnd.z), btnB, 1.2), COLORS.black),
+      wireMesh(lanePoints(vec(POWER_GND.x, POWER_GND.y, POWER_GND.z), btnB, 3.15, 1.15), COLORS.black),
     );
     this.buttonWires.visible = false;
     this.scene.add(this.buttonWires);
@@ -1183,7 +1272,9 @@ export class ArduinoScene {
   private onCanvasClick = (event: MouseEvent): void => {
     if (Math.hypot(event.clientX - this.downX, event.clientY - this.downY) > 5) return;
     if (this.pick(event as PointerEvent)) return;
-    this.selectPart(this.pickPart(event as PointerEvent));
+    let key = this.pickPart(event as PointerEvent);
+    if (key === 'breadboard') key = this.pickBreadboardNode();
+    this.selectPart(key);
   };
 
   private onPointerUp = (): void => {

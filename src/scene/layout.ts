@@ -75,15 +75,17 @@ export function railHoleX(index: number): number {
 }
 
 export const COMPONENT_LAYOUT = {
+  // Colonne 8 : fil de la broche 9 → résistance → colonne 11 → anode de la LED
+  // (même colonne = même nœud). La cathode est en colonne 12, reliée au GND.
   led: {
-    x: (holeX(10) + holeX(11)) / 2,
-    z: holeZ(6),
-    anode: { x: holeX(10), z: holeZ(6) },
-    cathode: { x: holeX(11), z: holeZ(6) },
+    x: (holeX(11) + holeX(12)) / 2,
+    z: holeZ(4),
+    anode: { x: holeX(11), z: holeZ(4) },
+    cathode: { x: holeX(12), z: holeZ(4) },
   },
   resistor: {
-    left: { x: holeX(8), z: holeZ(3) },
-    right: { x: holeX(11), z: holeZ(3) },
+    left: { x: holeX(8), z: holeZ(2) },
+    right: { x: holeX(11), z: holeZ(2) },
   },
   button: {
     x: (holeX(16) + holeX(17)) / 2,
