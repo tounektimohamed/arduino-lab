@@ -77,8 +77,8 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
   lcd: {
     name: { fr: 'Écran LCD I2C', ar: 'شاشة LCD I2C' },
     role: {
-      fr: 'Affiche du texte piloté par le microcontrôleur.',
-      ar: 'تعرض النصوص المُهيمن عليها من قبل المتحكم.',
+      fr: 'Affiche du texte (2 lignes de 16 caractères) envoyé par le microcontrôleur via 2 fils seulement : SDA et SCL.',
+      ar: 'تعرض نصًا (سطران من 16 حرفًا) يرسله المتحكم الدقيق عبر سلكين فقط: SDA وSCL.',
     },
     color: '#274060',
   },
@@ -241,7 +241,7 @@ void loop() {
 }
 `,
     components: ['button', 'led', 'resistor', 'wires'],
-    highlightPins: ['9', '2', 'GND'],
+    highlightPins: ['9', '2', 'GND', 'GND-F'],
   },
   {
     id: 'pot',
@@ -497,7 +497,7 @@ void loop() {
     hint: { fr: "Activez le son, lancez le code puis cliquez sur le bouton.", ar: "فعّل الصوت وشغّل الكود ثم انقر على الزرّ." },
     code: "// Leçon 9 — une sonnette\n\nconst int BOUTON = 2;\nconst int BUZZER = 8;\n\nvoid setup() {\n  pinMode(BOUTON, INPUT_PULLUP);\n  pinMode(BUZZER, OUTPUT);\n}\n\nvoid loop() {\n  if (digitalRead(BOUTON) == LOW) {\n    tone(BUZZER, NOTE_E4, 200);\n    delay(260);\n    tone(BUZZER, NOTE_C4, 400);\n    delay(500);\n  }\n  delay(20);\n}\n",
     components: ['button', 'buzzer', 'wires'],
-    highlightPins: ['2', '8', 'GND'],
+    highlightPins: ['2', '8', 'GND', 'GND-F'],
   },
   {
     id: "toggle",
@@ -512,7 +512,7 @@ void loop() {
     hint: { fr: "Cliquez une fois sur le bouton : la LED reste allumée.", ar: "انقر مرة على الزرّ: يبقى المصباح مضاءً." },
     code: "// Leçon 10 — interrupteur à bascule\n\nconst int LED = 9;\nconst int BOUTON = 2;\n\nbool allume = false;\nint dernier = HIGH;\n\nvoid setup() {\n  pinMode(LED, OUTPUT);\n  pinMode(BOUTON, INPUT_PULLUP);\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  int etat = digitalRead(BOUTON);\n\n  if (dernier == HIGH && etat == LOW) {\n    allume = !allume;\n    digitalWrite(LED, allume);\n    if (allume) {\n      Serial.println(\"ON\");\n    } else {\n      Serial.println(\"OFF\");\n    }\n  }\n\n  dernier = etat;\n  delay(20);\n}\n",
     components: ['button', 'led', 'resistor', 'wires'],
-    highlightPins: ['9', '2', 'GND'],
+    highlightPins: ['9', '2', 'GND', 'GND-F'],
   },
   {
     id: "theremin",
@@ -587,7 +587,7 @@ void loop() {
     hint: { fr: "Lancez le code, attendez la LED puis cliquez le plus vite possible.", ar: "شغّل الكود وانتظر المصباح ثم انقر بأسرع ما يمكن." },
     code: "// Leçon 15 — jeu de réflexes\n\nconst int LED = 9;\nconst int BOUTON = 2;\n\nvoid setup() {\n  pinMode(LED, OUTPUT);\n  pinMode(BOUTON, INPUT_PULLUP);\n  Serial.begin(9600);\n  Serial.println(\"Attendez la LED...\");\n}\n\nvoid loop() {\n  digitalWrite(LED, LOW);\n  delay(random(1500, 4000));\n\n  digitalWrite(LED, HIGH);\n  int debut = millis();\n\n  while (digitalRead(BOUTON) == HIGH) {\n    delay(1);\n  }\n\n  int temps = millis() - debut;\n  digitalWrite(LED, LOW);\n\n  Serial.print(\"Reaction : \");\n  Serial.print(temps);\n  Serial.println(\" ms\");\n\n  delay(2000);\n}\n",
     components: ['button', 'led', 'resistor', 'wires'],
-    highlightPins: ['9', '2', 'GND'],
+    highlightPins: ['9', '2', 'GND', 'GND-F'],
   },
   {
     id: 'lcd',
@@ -596,8 +596,8 @@ void loop() {
     duration: 12,
     level: { fr: 'Intermédiaire', ar: 'متوسط' },
     description: {
-      fr: 'L’écran LCD I2C reçoit les broches SDA et SCL (A4 et A5) et s’adresse par l’adresse 0x27. La bibliothèque LiquidCrystal gère le texte : begin(16, 2) prépare un écran 16 colonnes × 2 lignes, print() écrit, setCursor(x, y) place le curseur.',
-      ar: 'تستقبل شاشة LCD I2C منافذ SDA وSCL (A4 وA5) وتتواصل عبر العنوان 0x27. تدير مكتبة LiquidCrystal النص: begin(16, 2) تجهيز شاشة 16 عمودًا × 2 سطرًا، وprint() الكتابة، وsetCursor(x, y) موضع المؤشر.',
+      fr: 'L’écran LCD I2C reçoit les broches SDA et SCL (A4 et A5) et s’adresse par l’adresse 0x27. On déclare l’écran avec LiquidCrystal_I2C lcd(0x27, 16, 2) : adresse, colonnes, lignes. Ensuite init() le prépare, backlight() allume le rétroéclairage, setCursor(colonne, ligne) place le curseur et print() écrit.',
+      ar: 'تستقبل شاشة LCD I2C منافذ SDA وSCL (A4 وA5) وتتواصل عبر العنوان 0x27. نصرّح بالشاشة بـ LiquidCrystal_I2C lcd(0x27, 16, 2): العنوان وعدد الأعمدة والأسطر. ثم تجهّزها init() وتُضيء الإضاءة الخلفية backlight() وتحدّد setCursor(عمود، سطر) المؤشر وتكتب print().',
     },
     objectives: {
       fr: [
@@ -633,9 +633,9 @@ void loop() {
       fr: 'Lancez le code : le texte apparaît sur l’écran simulé.',
       ar: 'شغّل الكود: يظهر النص على الشاشة المحاكاة.',
     },
-    code: `// Leçon 16 — afficher sur l’écran LCD\n\nvoid setup() {\n  lcdBegin(39, 16, 2);\n}\n\nvoid loop() {\n  lcdPrint("Arduino Lab");\n  lcdSetCursor(0, 1);\n  lcdPrint("LCD I2C");\n  delay(1000);\n}\n`,
+    code: `// Leçon 16 — afficher sur l’écran LCD\n#include <Wire.h>\n#include <LiquidCrystal_I2C.h>\n\nLiquidCrystal_I2C lcd(0x27, 16, 2);\n\nint compteur = 0;\n\nvoid setup() {\n  lcd.init();\n  lcd.backlight();\n}\n\nvoid loop() {\n  lcd.setCursor(0, 0);\n  lcd.print("Arduino Lab");\n\n  lcd.setCursor(0, 1);\n  lcd.print("Compteur : ");\n  lcd.print(compteur);\n\n  compteur++;\n  delay(500);\n}\n`,
     components: ['lcd', 'wires'],
-    highlightPins: ['A4', 'A5', '5V', 'GND'],
+    highlightPins: ['A4', 'A5', '5V', 'GND-F'],
   },
 ];
 

@@ -108,6 +108,8 @@ export class ArduinoScene {
   private readonly servoWires = new THREE.Group();
   private readonly lcdGroup = new THREE.Group();
   private readonly lcdWires = new THREE.Group();
+  private readonly lcdCanvas = document.createElement('canvas');
+  private lcdTexture!: THREE.CanvasTexture;
   private readonly lamp = new THREE.Group();
   private readonly partKeys = new Map<THREE.Object3D, string>();
   private selection: THREE.BoxHelper | null = null;
@@ -239,7 +241,8 @@ export class ArduinoScene {
   }
 
   private viewTarget(): THREE.Vector3 {
-    return vec(0.3, 0.35, this.activeComponents.includes('servo') ? 1.6 : 0.25);
+    const near = this.activeComponents.includes('servo') || this.activeComponents.includes('lcd');
+    return vec(0.3, 0.35, near ? 1.6 : 0.25);
   }
 
   private buildEnvironment(): void {
@@ -1051,36 +1054,100 @@ export class ArduinoScene {
     this.scene.add(this.servoGroup);
   }
 
+  /**
+   * Module LCD 16x2 I2C posé sur le bureau (comme le servo) : il n'est PAS planté dans la platine.
+   * Il se câble directement sur la carte : GND, VCC, SDA (A4) et SCL (A5).
+   */
   private buildLcd(): void {
-    this.lcdGroup.position.set(holeX(18), BREADBOARD.h, holeZ(9));
+    this.lcdGroup.position.set(-2.6, 0, 5.3);
 
-    const bezel = new THREE.Mesh(
-      new THREE.BoxGeometry(1.9, 0.16, 1.1),
-      std(0x15181c, { roughness: 0.5 }),
-    );
-    bezel.position.y = 0.08;
-    bezel.castShadow = true;
-    bezel.receiveShadow = true;
-    this.lcdGroup.add(bezel);
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.1, 1.8), std(0x1e4fa0, { roughness: 0.6 }));
+    pcb.position.y = 0.05;
+    pcb.castShadow = true;
+    pcb.receiveShadow = true;
+    this.lcdGroup.add(pcb);
 
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.14, 1.35), std(0x0e1114, { roughness: 0.5 }));
+    frame.position.set(0, 0.17, 0.1);
+    frame.castShadow = true;
+    this.lcdGroup.add(frame);
+
+    this.lcdCanvas.width = 640;
+    this.lcdCanvas.height = 180;
+    this.lcdTexture = new THREE.CanvasTexture(this.lcdCanvas);
+    this.lcdTexture.colorSpace = THREE.SRGBColorSpace;
     const screen = new THREE.Mesh(
-      new THREE.BoxGeometry(1.7, 0.1, 0.9),
+      new THREE.PlaneGeometry(3.2, 0.9),
       new THREE.MeshStandardMaterial({
-        color: 0x0d1b2a,
-        emissive: 0x8fd3ff,
-        emissiveIntensity: this.board.lcdBacklightOn ? 0.35 : 0,
-        roughness: 0.35,
-        metalness: 0.2,
+        map: this.lcdTexture,
+        emissiveMap: this.lcdTexture,
+        emissive: 0xffffff,
+        emissiveIntensity: 0.55,
+        roughness: 0.4,
       }),
     );
-    screen.position.y = 0.12;
-    screen.castShadow = true;
-    screen.receiveShadow = true;
+    screen.rotation.x = -Math.PI / 2;
+    screen.position.set(0, 0.245, 0.1);
     this.lcdGroup.add(screen);
 
+    // Embase 4 broches (GND, VCC, SDA, SCL) sur le bord arrière du module.
+    const header = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.12, 0.14), std(0x15171a));
+    header.position.set(-1.4, 0.16, -0.82);
+    this.lcdGroup.add(header);
+    const gold = std(0xd4af37, { metalness: 0.8, roughness: 0.3 });
+    const pinX = [-1.73, -1.51, -1.29, -1.07];
+    for (const x of pinX) {
+      const pin = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.3, 0.035), gold);
+      pin.position.set(x, 0.3, -0.82);
+      this.lcdGroup.add(pin);
+    }
+
+    // Câbles : GND→GND, 5V→VCC, A4→SDA, A5→SCL (chaque fil va à une broche différente).
+    const v = (p: { x: number; y: number; z: number }): THREE.Vector3 => vec(p.x, p.y, p.z);
+    const tip = (index: number): THREE.Vector3 =>
+      vec(this.lcdGroup.position.x + pinX[index], 0.46, this.lcdGroup.position.z - 0.82);
+    this.lcdWires.add(
+      wireMesh(archPoints(v(POWER_GND), tip(0), 1.7), COLORS.black),
+      wireMesh(archPoints(v(pinWorld('5V')), tip(1), 1.35), COLORS.red),
+      wireMesh(archPoints(v(pinWorld('A4')), tip(2), 0.8), COLORS.blue),
+      wireMesh(archPoints(v(pinWorld('A5')), tip(3), 1.0), 0xe0b21e),
+    );
+    this.lcdWires.visible = false;
+    this.scene.add(this.lcdWires);
+
+    this.drawLcd(this.board.lcdLines(), this.board.lcdBacklightOn);
     this.registerPart(this.lcdGroup, 'lcd');
     this.scene.add(this.lcdGroup);
     this.lcdGroup.visible = false;
+  }
+
+  /** Dessine la grille 16x2 de caractères sur la texture de l'écran. */
+  private drawLcd(lines: string[], backlight: boolean): void {
+    const ctx = this.lcdCanvas.getContext('2d');
+    if (!ctx) return;
+    const width = this.lcdCanvas.width;
+    const height = this.lcdCanvas.height;
+    const cellW = width / 16;
+    const cellH = height / 2;
+
+    ctx.fillStyle = backlight ? '#2f86e8' : '#1a2536';
+    ctx.fillRect(0, 0, width, height);
+    ctx.font = `bold ${Math.floor(cellH * 0.78)}px "Courier New", monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let row = 0; row < 2; row++) {
+      for (let col = 0; col < 16; col++) {
+        ctx.fillStyle = backlight ? 'rgba(10, 50, 120, 0.28)' : 'rgba(255, 255, 255, 0.04)';
+        ctx.fillRect(col * cellW + 2, row * cellH + 6, cellW - 4, cellH - 12);
+        const char = lines[row]?.[col] ?? ' ';
+        if (char !== ' ') {
+          ctx.fillStyle = backlight ? '#f2f9ff' : '#3b4d68';
+          ctx.fillText(char, col * cellW + cellW / 2, row * cellH + cellH / 2 + 2);
+        }
+      }
+    }
+    this.lcdTexture.needsUpdate = true;
   }
 
   private buildExtraWires(): void {
@@ -1176,7 +1243,7 @@ export class ArduinoScene {
   }
 
   private buildHighlights(): void {
-    for (const label of ['9', '2', 'A0', '5V', 'GND', 'GND-F', '8', '10', 'A1']) {
+    for (const label of ['9', '2', 'A0', '5V', 'GND', 'GND-F', '8', '10', 'A1', 'A4', 'A5']) {
       const pin = label === 'GND-F' ? POWER_GND : pinWorld(label);
 
       const ring = new THREE.Mesh(
@@ -1415,6 +1482,9 @@ export class ArduinoScene {
         break;
       case 'light':
         this.setLightVisual(event.value);
+        break;
+      case 'lcd':
+        this.drawLcd(event.lines, event.backlight);
         break;
     }
   };

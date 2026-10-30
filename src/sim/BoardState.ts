@@ -69,7 +69,8 @@ export type BoardEvent =
   | { type: 'pot'; value: number }
   | { type: 'tone'; pin: number; freq: number }
   | { type: 'servo'; pin: number; angle: number }
-  | { type: 'light'; value: number };
+  | { type: 'light'; value: number }
+  | { type: 'lcd'; lines: string[]; backlight: boolean };
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -82,7 +83,7 @@ export class BoardState {
   lightValue = 650;
   servoAngle = 90;
   private toneTimer: number | null = null;
-  private lcdText = '';
+  private lcdBuffer: string[][] = [];
   lcdColumns = 16;
   lcdRows = 2;
   lcdAddress = 39;
@@ -107,17 +108,18 @@ export class BoardState {
     this.buttonPressed = false;
     this.clearToneTimer();
     this.servoAngle = 90;
-    this.lcdText = '';
     this.lcdColumns = 16;
     this.lcdRows = 2;
     this.lcdAddress = 39;
     this.lcdBacklightOn = true;
     this.lcdColumn = 0;
     this.lcdRow = 0;
+    this.lcdClearBuffer();
     this.emit({ type: 'reset' });
     this.emit({ type: 'pot', value: this.potValue });
     this.emit({ type: 'light', value: this.lightValue });
     this.emit({ type: 'servo', pin: 10, angle: 90 });
+    this.emitLcd();
     this.emit({ type: 'tone', pin: 8, freq: 0 });
   }
 
@@ -187,14 +189,26 @@ export class BoardState {
     this.lcdAddress = address;
     this.lcdColumns = columns;
     this.lcdRows = rows;
-    this.lcdColumn = 0;
-    this.lcdRow = 0;
+    this.lcdClear();
   }
 
   lcdClear(): void {
-    this.lcdText = '';
+    this.lcdClearBuffer();
     this.lcdColumn = 0;
     this.lcdRow = 0;
+    this.emitLcd();
+  }
+
+  lcdLines(): string[] {
+    return this.lcdBuffer.map((row) => row.join(''));
+  }
+
+  private lcdClearBuffer(): void {
+    this.lcdBuffer = Array.from({ length: this.lcdRows }, () => Array<string>(this.lcdColumns).fill(' '));
+  }
+
+  private emitLcd(): void {
+    this.emit({ type: 'lcd', lines: this.lcdLines(), backlight: this.lcdBacklightOn });
   }
 
   lcdHome(): void {
@@ -208,11 +222,24 @@ export class BoardState {
   }
 
   lcdPrint(text: string, newline: boolean = false): void {
-    this.lcdText = newline ? `${this.lcdText}${text}\n` : `${this.lcdText}${text}`;
+    for (const char of newline ? `${text}\n` : text) {
+      if (char === '\n') {
+        this.lcdRow++;
+        this.lcdColumn = 0;
+        continue;
+      }
+      // Comme sur un vrai HD44780, ce qui dépasse de l'écran n'est pas affiché.
+      if (this.lcdRow < this.lcdRows && this.lcdColumn < this.lcdColumns) {
+        this.lcdBuffer[this.lcdRow][this.lcdColumn] = char;
+      }
+      this.lcdColumn++;
+    }
+    this.emitLcd();
   }
 
   lcdBacklight(on: boolean): void {
     this.lcdBacklightOn = on;
+    this.emitLcd();
   }
 
   servoWrite(pin: number, angle: number): void {

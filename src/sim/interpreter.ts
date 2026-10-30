@@ -58,6 +58,7 @@ type Expr =
 type Stmt =
   | { type: 'block'; body: Stmt[] }
   | { type: 'decl'; decls: { name: string; init: Expr | null }[] }
+  | { type: 'lcd'; name: string; args: Expr[] }
   | { type: 'expr'; expr: Expr }
   | { type: 'if'; cond: Expr; then: Stmt; otherwise?: Stmt }
   | { type: 'while'; cond: Expr; body: Stmt }
@@ -92,6 +93,7 @@ const TYPE_WORDS = new Set([
   'word',
   'String',
   'Servo',
+  'LiquidCrystal_I2C',
   'auto',
 ]);
 const MODIFIERS = new Set(['const', 'static', 'volatile']);
@@ -155,7 +157,12 @@ function tokenize(code: string): Token[] {
 
     if (/[0-9]/.test(char)) {
       const start = i;
-      while (i < length && /[0-9.]/.test(code[i])) i++;
+      if (char === '0' && (code[i + 1] === 'x' || code[i + 1] === 'X')) {
+        i += 2;
+        while (i < length && /[0-9a-fA-F]/.test(code[i])) i++;
+      } else {
+        while (i < length && /[0-9.]/.test(code[i])) i++;
+      }
       tokens.push({ type: 'num', value: code.slice(start, i), pos: start });
       continue;
     }
@@ -224,7 +231,22 @@ class Parser {
         const save = this.index;
         while (this.peek().type === 'id' && MODIFIERS.has(this.peek().value)) this.next();
         if (this.peek().type === 'id' && TYPE_WORDS.has(this.peek().value)) {
-          this.next();
+          const typeName = this.next().value;
+          if (typeName === 'LiquidCrystal_I2C' && this.peek().type === 'id' && this.peek(1).value === '(') {
+            // LiquidCrystal_I2C lcd(0x27, 16, 2);
+            const name = this.next().value;
+            this.expect('(');
+            const args: Expr[] = [];
+            if (!this.check(')')) {
+              do {
+                args.push(this.parseExpression());
+              } while (this.match(','));
+            }
+            this.expect(')');
+            this.expect(';');
+            globals.push({ type: 'lcd', name, args });
+            continue;
+          }
           if (this.peek().type === 'id' && this.peek(1).value === '(') {
             const name = this.next().value;
             const params = this.parseParams();
@@ -449,7 +471,7 @@ class Parser {
     const token = this.peek();
     if (token.type === 'num') {
       this.next();
-      return { type: 'num', value: Number.parseFloat(token.value) };
+      return { type: 'num', value: Number(token.value) };
     }
     if (token.type === 'str') {
       this.next();
@@ -622,6 +644,7 @@ class Executor {
   private ops = 0;
   private callDepth = 0;
   private servos = new Map<string, number>();
+  private lcds = new Map<string, { address: number; columns: number; rows: number }>();
 
   constructor(
     private program: ParsedProgram,
@@ -680,6 +703,15 @@ class Executor {
           scope.set(declaration.name, value);
         }
         return;
+      case 'lcd': {
+        const values = await Promise.all(stmt.args.map((arg) => this.evaluate(arg, scope)));
+        this.lcds.set(stmt.name, {
+          address: toNumber(values[0] ?? 39),
+          columns: toNumber(values[1] ?? 16),
+          rows: toNumber(values[2] ?? 2),
+        });
+        return;
+      }
       case 'expr':
         await this.evaluate(stmt.expr, scope);
         return;
@@ -800,6 +832,35 @@ class Executor {
       if (member.object.type === 'id') {
         const name = member.object.name;
         const num = (index: number): number => toNumber(args[index] ?? 0);
+        const lcd = this.lcds.get(name);
+        if (lcd) {
+          switch (member.property) {
+            case 'init':
+            case 'begin':
+              this.runtime.lcdBegin(lcd.address, lcd.columns, lcd.rows);
+              return 0;
+            case 'backlight':
+              this.runtime.lcdBacklight(true);
+              return 0;
+            case 'noBacklight':
+              this.runtime.lcdBacklight(false);
+              return 0;
+            case 'clear':
+              this.runtime.lcdClear();
+              return 0;
+            case 'home':
+              this.runtime.lcdHome();
+              return 0;
+            case 'setCursor':
+              this.runtime.lcdSetCursor(num(0), num(1));
+              return 0;
+            case 'print':
+              this.runtime.lcdPrint(formatValue(args[0] ?? ''), false);
+              return 0;
+            default:
+              throw new ProgramError(`lcd.${member.property}() n'est pas supporté.`);
+          }
+        }
         switch (member.property) {
           case 'attach':
             this.servos.set(name, num(0));
