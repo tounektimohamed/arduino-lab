@@ -270,6 +270,14 @@ export class BoardState {
     this.emit({ type: 'servo', pin, angle: this.servoAngle });
   }
 
+  motorSpeed(): number {
+    return this.pwmValues.get(9) ?? 0;
+  }
+
+  motorDirection(): number {
+    return this.outputs.get(8) ? 1 : -1;
+  }
+
   /** TMP36 : 0,5 V à 0 °C + 10 mV par °C, converti sur 10 bits (5 V = 1023). */
   private tempAdc(): number {
     return Math.round(((this.tempC / 100 + 0.5) / 5) * 1023);

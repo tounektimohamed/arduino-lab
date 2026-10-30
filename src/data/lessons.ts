@@ -1,7 +1,7 @@
 import type { Localized } from '../i18n';
 
-export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd' | 'distance' | 'thermo';
-export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd' | 'ultrasonic' | 'tmp36';
+export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd' | 'distance' | 'thermo' | 'dc-motor-shield';
+export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd' | 'ultrasonic' | 'tmp36' | 'motor';
 
 export interface ComponentPhoto {
   src: string;
@@ -86,6 +86,20 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       author: 'Limor Fried (Adafruit)',
       license: 'CC BY 2.0',
       source: 'https://commons.wikimedia.org/wiki/File:F-F_jumper_wires.jpg',
+    },
+  },
+  motor: {
+    name: { fr: 'Moteur DC', ar: 'محرّك تيار مستمر' },
+    role: {
+      fr: 'Tourne quand on lui envoie une tension PWM ; le sens dépend du signal de commande.',
+      ar: 'يدور عند الإرسال بتقنية PWM، ويحدّد اتجاهه إشارة السيطرة.',
+    },
+    color: '#b71c1c',
+    photo: {
+      src: '/components/motor.webp',
+      author: 'Raimond Spekking',
+      license: 'CC BY-SA 4.0',
+      source: 'https://commons.wikimedia.org/wiki/File:TecTro_14165009_-_Motor_R280-6440.jpg',
     },
   },
   buzzer: {
@@ -786,6 +800,39 @@ void loop() {
     code: `// Leçon 18 — station de température\n#include <Wire.h>\n#include <LiquidCrystal_I2C.h>\n\nLiquidCrystal_I2C lcd(0x27, 16, 2);\n\nconst int SONDE = A1;\nconst int BUZZER = 8;\nconst int LED = 9;\nconst int SEUIL = 30;\n\nvoid setup() {\n  pinMode(BUZZER, OUTPUT);\n  pinMode(LED, OUTPUT);\n  lcd.init();\n  lcd.backlight();\n}\n\nvoid loop() {\n  int mesure = analogRead(SONDE);\n  float tension = mesure * 5.0 / 1023.0;\n  int temperature = round((tension - 0.5) * 100.0);\n\n  lcd.setCursor(0, 0);\n  lcd.print(\"Temperature :\");\n  lcd.setCursor(0, 1);\n  lcd.print(temperature);\n  lcd.print(\" C   \");\n\n  if (temperature >= SEUIL) {\n    digitalWrite(LED, HIGH);\n    tone(BUZZER, 880, 150);\n  } else {\n    digitalWrite(LED, LOW);\n    noTone(BUZZER);\n  }\n\n  delay(300);\n}\n`,
     components: ['tmp36', 'lcd', 'buzzer', 'led', 'resistor', 'wires'],
     highlightPins: ['A1', 'A4', 'A5', '5V', 'GND-F', '8', '9', 'GND'],
+  },
+  {
+    id: 'dc-motor-shield',
+    title: { fr: 'Moteur DC via shield', ar: 'محرّك تيار مستمر عبر درع' },
+    tagline: {
+      fr: 'Faire tourner un moteur DC et inverser son sens avec un shield et deux broches.',
+      ar: 'تدوير محرّك تيار مستمر وعكس اتجاهه باستخدام درع ومنفذين.',
+    },
+    duration: 16,
+    level: { fr: 'Intermédiaire', ar: 'متوسط' },
+    description: {
+      fr: 'Le shield pilote le moteur à partir de deux broches Arduino : la broche 9 régule la vitesse par PWM (analogWrite) et la broche 8 choisit le sens de rotation (digitalWrite). Réglez le curseur pour faire varier la vitesse.',
+      ar: 'يدير الدرع المحرّك من خلال منفذي أردوينو: المنفذ 9 يضبط السرعة باستخدام PWM (analogWrite) والمنفذ 8 يختار اتجاه الدوران (digitalWrite). ضبّط المنزلق لتعديل السرعة.',
+    },
+    objectives: {
+      fr: ['Contrôler la vitesse avec analogWrite().', 'Changer le sens de rotation avec digitalWrite().', 'Lire la valeur sur le moniteur série.'],
+      ar: ['التحكم في السرعة عبر analogWrite().', 'تغيير اتجاه الدوران عبر digitalWrite().', 'اقرأ القيمة على مراقب المنفذ التسلسلي.'],
+    },
+    wiring: {
+      fr: ['Shield moteur : VCC → 5V, GND → GND.', 'ENA (vitesse) → broche 9 (PWM).', 'IN1 (sens) → broche 8.', 'Moteur sur les bornes M du shield.'],
+      ar: ['درع المحرّك: VCC ← 5V، وGND ← GND.', 'ENA (السرعة) ← المنفذ 9 (PWM).', 'IN1 (الاتجاه) ← المنفذ 8.', 'المحرّك على منافذ M بالدرع.'],
+    },
+    challenge: {
+      fr: 'Faites tourner le moteur à vitesse max pendant 3 secondes, puis arrêtez-le 2 secondes.',
+      ar: 'اجعل المحرّك يدور بأقصى سرعة لمدة 3 ثوانٍ، ثم توقّفه ثانيتين.',
+    },
+    hint: {
+      fr: 'Lancez le code : le moteur accélère, ralentit et change de sens.',
+      ar: 'شغّل الكود: يسرّع المحرّك ثمّ يبطئ ويغيّر اتجاهه.',
+    },
+    code: `// Leçon 19 — moteur DC via shield\nconst int PWM = 9;\nconst int DIR = 8;\n\nint vitesse = 0;\nint sens = 1;\n\nvoid setup() {\n  pinMode(PWM, OUTPUT);\n  pinMode(DIR, OUTPUT);\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  if (sens == 1) {\n    digitalWrite(DIR, HIGH);\n  } else {\n    digitalWrite(DIR, LOW);\n  }\n  analogWrite(PWM, vitesse);\n  Serial.print("Vitesse : ");\n  Serial.println(vitesse);\n  vitesse += sens * 5;\n  if (vitesse >= 255) { sens = -1; vitesse = 255; }\n  if (vitesse <= 0) { sens = 1; vitesse = 0; }\n  delay(30);\n}\n`,
+    components: ['motor', 'wires'],
+    highlightPins: ['9', '8', '5V', 'GND'],
   },
 ];
 

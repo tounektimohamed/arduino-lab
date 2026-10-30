@@ -295,6 +295,19 @@ export function starterFor(lessonId: string): Workspace {
         ],
       );
 
+    case 'dc-motor-shield':
+      return ws(
+        [mode(9), mode(8)],
+        [
+          mk('write', { pin: '8', level: 'HIGH' }),
+          setv('vitesse', 150),
+          mk('pwm', { pin: '9' }, { v: V('vitesse') }),
+          print('Vitesse : '),
+          mk('printval', {}, { v: V('vitesse') }),
+          wait(200),
+        ],
+      );
+
     default:
       return emptyWorkspace();
   }

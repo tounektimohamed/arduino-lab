@@ -948,7 +948,7 @@ export class App {
   }
 
   private renderComponentsModal(): void {
-    const ids: ComponentId[] = ['led', 'resistor', 'button', 'pot', 'buzzer', 'ldr', 'servo', 'ultrasonic', 'tmp36', 'lcd', 'wires'];
+    const ids: ComponentId[] = ['led', 'resistor', 'button', 'pot', 'buzzer', 'ldr', 'servo', 'ultrasonic', 'tmp36', 'lcd', 'wires', 'motor'];
     this.componentGrid.replaceChildren();
 
     for (const id of ids) {

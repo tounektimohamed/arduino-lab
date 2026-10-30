@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CylinderGeometry } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -139,6 +140,10 @@ export class ArduinoScene {
   private servoHorn!: THREE.Group;
   private servoTarget = 90;
   private servoCurrent = 90;
+
+  private readonly motorGroup = new THREE.Group();
+  private motorShaft!: THREE.Group;
+  private motorCurrent = 0;
   private toneFreq = 0;
   private lightLevel = 0.63;
   private exposure = 1.05;
@@ -223,6 +228,7 @@ export class ArduinoScene {
     this.ldrWires.visible = has('ldr');
     this.servoGroup.visible = has('servo');
     this.servoWires.visible = has('servo');
+    this.motorGroup.visible = has('motor');
     this.lcdGroup.visible = has('lcd');
     this.lcdWires.visible = has('lcd');
     this.ultraGroup.visible = has('ultrasonic');
@@ -1071,6 +1077,41 @@ export class ArduinoScene {
     this.servoGroup.visible = false;
     this.registerPart(this.servoGroup, 'servo');
     this.scene.add(this.servoGroup);
+
+    this.buildMotor();
+  }
+
+  private buildMotor(): void {
+    this.motorGroup.position.set(8.2, 0.08, 0.5);
+    const blue = std(0x7f7f7f, { metalness: 0.7, roughness: 0.3 });
+
+    const body = new THREE.Mesh(new CylinderGeometry(0.42, 0.42, 0.78, 24), blue);
+    body.position.y = 0.44;
+    body.castShadow = true;
+    this.motorGroup.add(body);
+
+    const endCap = new THREE.Mesh(new CylinderGeometry(0.45, 0.45, 0.16, 24), std(0x222225));
+    endCap.position.y = 0.06;
+    this.motorGroup.add(endCap);
+
+    const bracket = new THREE.Mesh(new RoundedBoxGeometry(0.8, 0.14, 1.05, 1, 0.03), std(0x44444a));
+    bracket.position.y = 0.06;
+    bracket.position.z = -0.44;
+    this.motorGroup.add(bracket);
+
+    this.motorShaft = new THREE.Group();
+    this.motorShaft.position.set(0, 0.44, 0.86);
+    const shaft = new THREE.Mesh(new CylinderGeometry(0.085, 0.085, 0.52, 16), std(0x66666a, { metalness: 0.85 }));
+    shaft.position.z = 0.25;
+    this.motorShaft.add(shaft);
+    const hub = new THREE.Mesh(new CylinderGeometry(0.2, 0.2, 0.11, 20), std(0x44444a));
+    hub.position.z = -0.03;
+    this.motorShaft.add(hub);
+    this.motorGroup.add(this.motorShaft);
+
+    this.motorGroup.visible = false;
+    this.registerPart(this.motorGroup, 'motor');
+    this.scene.add(this.motorGroup);
   }
 
   /**
@@ -1700,6 +1741,11 @@ export class ArduinoScene {
     const maxStep = 420 * delta;
     this.servoCurrent += Math.max(-maxStep, Math.min(maxStep, this.servoTarget - this.servoCurrent));
     this.servoHorn.rotation.y = THREE.MathUtils.degToRad(this.servoCurrent);
+
+    const maxStepMotor = 520 * delta;
+    const targetMotor = this.board.motorSpeed() * this.board.motorDirection();
+    this.motorCurrent += Math.max(-maxStepMotor, Math.min(maxStepMotor, targetMotor - this.motorCurrent));
+    this.motorShaft.rotation.y += this.motorCurrent * 0.008 * delta;
 
     this.soundRings.forEach((ring, index) => {
       const material = ring.material as THREE.MeshBasicMaterial;
