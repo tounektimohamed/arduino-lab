@@ -123,8 +123,22 @@ export const BOARD_PARTS: Record<string, PartInfo> = {
   breadboard: {
     name: { fr: 'Platine d’essai (breadboard)', ar: 'لوحة التجارب (بريدبورد)' },
     role: {
-      fr: 'Câblage sans soudure : les 5 trous d’une même colonne sont reliés entre eux.',
-      ar: 'توصيل دون لحام: الثقوب الخمسة في العمود الواحد متصلة ببعضها.',
+      fr: 'Câblage sans soudure. Cliquez sur un trou pour voir quels trous sont reliés.',
+      ar: 'توصيل دون لحام. انقر على أي ثقب لترى الثقوب المتصلة به.',
+    },
+  },
+  breadboardColumn: {
+    name: { fr: 'Colonne de 5 trous reliés', ar: 'عمود من 5 ثقوب متصلة' },
+    role: {
+      fr: 'Le courant circule dans le sens de la colonne (vertical sur la platine) : ces 5 trous forment un seul point électrique. La rainure centrale coupe la colonne en deux moitiés indépendantes.',
+      ar: 'يسري التيار على امتداد العمود (عموديًا على اللوحة): هذه الثقوب الخمسة نقطة كهربائية واحدة. والأخدود الأوسط يقسم العمود إلى نصفين مستقلين.',
+    },
+  },
+  breadboardRail: {
+    name: { fr: 'Rail d’alimentation', ar: 'سكّة التغذية' },
+    role: {
+      fr: 'Contrairement aux colonnes, un rail est relié dans le sens horizontal, sur toute la longueur : on y met 5V ou GND pour alimenter plusieurs composants.',
+      ar: 'على عكس الأعمدة، السكّة موصولة أفقيًا على كامل الطول: نضع عليها 5V أو GND لتغذية عدة مكوّنات.',
     },
   },
 };

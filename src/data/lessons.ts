@@ -1,7 +1,7 @@
 import type { Localized } from '../i18n';
 
-export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction';
-export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo';
+export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd';
+export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd';
 
 export interface ComponentInfo {
   name: Localized;
@@ -73,6 +73,14 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'يدور إلى زاوية دقيقة من 0° إلى 180° حسب الأمر.',
     },
     color: '#3b6fb6',
+  },
+  lcd: {
+    name: { fr: 'Écran LCD I2C', ar: 'شاشة LCD I2C' },
+    role: {
+      fr: 'Affiche du texte piloté par le microcontrôleur.',
+      ar: 'تعرض النصوص المُهيمن عليها من قبل المتحكم.',
+    },
+    color: '#274060',
   },
 };
 
@@ -580,6 +588,54 @@ void loop() {
     code: "// Leçon 15 — jeu de réflexes\n\nconst int LED = 9;\nconst int BOUTON = 2;\n\nvoid setup() {\n  pinMode(LED, OUTPUT);\n  pinMode(BOUTON, INPUT_PULLUP);\n  Serial.begin(9600);\n  Serial.println(\"Attendez la LED...\");\n}\n\nvoid loop() {\n  digitalWrite(LED, LOW);\n  delay(random(1500, 4000));\n\n  digitalWrite(LED, HIGH);\n  int debut = millis();\n\n  while (digitalRead(BOUTON) == HIGH) {\n    delay(1);\n  }\n\n  int temps = millis() - debut;\n  digitalWrite(LED, LOW);\n\n  Serial.print(\"Reaction : \");\n  Serial.print(temps);\n  Serial.println(\" ms\");\n\n  delay(2000);\n}\n",
     components: ['button', 'led', 'resistor', 'wires'],
     highlightPins: ['9', '2', 'GND'],
+  },
+  {
+    id: 'lcd',
+    title: { fr: 'Afficher sur l’écran LCD', ar: 'عرض على شاشة LCD' },
+    tagline: { fr: 'Un écran I2C pour afficher du texte avec LiquidCrystal.', ar: 'شاشة I2C لعرض النص مع LiquidCrystal.' },
+    duration: 12,
+    level: { fr: 'Intermédiaire', ar: 'متوسط' },
+    description: {
+      fr: 'L’écran LCD I2C reçoit les broches SDA et SCL (A4 et A5) et s’adresse par l’adresse 0x27. La bibliothèque LiquidCrystal gère le texte : begin(16, 2) prépare un écran 16 colonnes × 2 lignes, print() écrit, setCursor(x, y) place le curseur.',
+      ar: 'تستقبل شاشة LCD I2C منافذ SDA وSCL (A4 وA5) وتتواصل عبر العنوان 0x27. تدير مكتبة LiquidCrystal النص: begin(16, 2) تجهيز شاشة 16 عمودًا × 2 سطرًا، وprint() الكتابة، وsetCursor(x, y) موضع المؤشر.',
+    },
+    objectives: {
+      fr: [
+        'Initialiser un écran LCD avec LiquidCrystal.',
+        'Écrire du texte avec print().',
+        'Placer le curseur avec setCursor().',
+      ],
+      ar: [
+        'تهيئة شاشة LCD مع LiquidCrystal.',
+        'كتابة النص بـ print().',
+        'تحديد موضع المؤشر بـ setCursor().',
+      ],
+    },
+    wiring: {
+      fr: [
+        'SDA (A4) → SDA du LCD.',
+        'SCL (A5) → SCL du LCD.',
+        'VCC (5V) → VCC du LCD.',
+        'GND → GND du LCD.',
+      ],
+      ar: [
+        'SDA (A4) ← SDA للشاشة.',
+        'SCL (A5) ← SCL للشاشة.',
+        'VCC (5V) ← VCC للشاشة.',
+        'GND ← GND للشاشة.',
+      ],
+    },
+    challenge: {
+      fr: 'Affichez deux lignes de texte avec un changement de contenu dans loop().',
+      ar: 'اعرض نصين في سطرين مع تغيير المحتوى داخل loop().',
+    },
+    hint: {
+      fr: 'Lancez le code : le texte apparaît sur l’écran simulé.',
+      ar: 'شغّل الكود: يظهر النص على الشاشة المحاكاة.',
+    },
+    code: `// Leçon 16 — afficher sur l’écran LCD\n\nvoid setup() {\n  lcdBegin(39, 16, 2);\n}\n\nvoid loop() {\n  lcdPrint("Arduino Lab");\n  lcdSetCursor(0, 1);\n  lcdPrint("LCD I2C");\n  delay(1000);\n}\n`,
+    components: ['lcd', 'wires'],
+    highlightPins: ['A4', 'A5', '5V', 'GND'],
   },
 ];
 
