@@ -3,10 +3,18 @@ import type { Localized } from '../i18n';
 export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd' | 'distance' | 'thermo';
 export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd' | 'ultrasonic' | 'tmp36';
 
+export interface ComponentPhoto {
+  src: string;
+  author: string;
+  license: string;
+  source: string;
+}
+
 export interface ComponentInfo {
   name: Localized;
   role: Localized;
   color: string;
+  photo: ComponentPhoto;
 }
 
 export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
@@ -17,6 +25,12 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'يحوّل التيار إلى ضوء. الساق الطويلة هي الأنود (+).',
     },
     color: '#e2543f',
+    photo: {
+      src: '/components/led.webp',
+      author: 'oomlout',
+      license: 'CC BY-SA 2.0',
+      source: 'https://commons.wikimedia.org/wiki/File:5mm_Red_LED.jpg',
+    },
   },
   resistor: {
     name: { fr: 'Résistance 220 Ω', ar: 'مقاومة 220 أوم' },
@@ -25,6 +39,12 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'تحدّ من التيار لحماية المصباح واللوحة.',
     },
     color: '#c89b6d',
+    photo: {
+      src: '/components/resistor.webp',
+      author: 'oomlout',
+      license: 'CC BY-SA 2.0',
+      source: 'https://commons.wikimedia.org/wiki/File:220_ohms_5%25_axial_resistor.jpg',
+    },
   },
   button: {
     name: { fr: 'Bouton poussoir', ar: 'زرّ ضغط' },
@@ -33,6 +53,12 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'يغلق الدائرة أو يفتحها عند الضغط عليه.',
     },
     color: '#4c5a68',
+    photo: {
+      src: '/components/button.webp',
+      author: 'Scwerllguy',
+      license: 'CC BY-SA 3.0',
+      source: 'https://commons.wikimedia.org/wiki/File:Tactile_switches.jpg',
+    },
   },
   pot: {
     name: { fr: 'Potentiomètre 10 kΩ', ar: 'مقياس جهد 10 كيلو أوم' },
@@ -41,6 +67,12 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'مقاومة قابلة للضبط: يتحوّل موضعها إلى جهد كهربائي.',
     },
     color: '#3f7bd9',
+    photo: {
+      src: '/components/pot.webp',
+      author: 'oomlout',
+      license: 'CC BY-SA 2.0',
+      source: 'https://commons.wikimedia.org/wiki/File:10k_Ohm_Breadboard_Compatible_Potentiometer.jpg',
+    },
   },
   wires: {
     name: { fr: 'Fils de liaison', ar: 'أسلاك التوصيل' },
@@ -49,6 +81,12 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'تربط المكوّنات بمنافذ اللوحة.',
     },
     color: '#2f9e6f',
+    photo: {
+      src: '/components/wires.webp',
+      author: 'Limor Fried (Adafruit)',
+      license: 'CC BY 2.0',
+      source: 'https://commons.wikimedia.org/wiki/File:F-F_jumper_wires.jpg',
+    },
   },
   buzzer: {
     name: { fr: 'Buzzer piézo', ar: 'جرس بيزو' },
@@ -57,6 +95,12 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'يهتزّ بالتردد المُرسَل إليه: كل تردد هو نغمة.',
     },
     color: '#2b2b2f',
+    photo: {
+      src: '/components/buzzer.webp',
+      author: 'Stefan Riepl (Quark48)',
+      license: 'CC BY-SA 2.0 de',
+      source: 'https://commons.wikimedia.org/wiki/File:Piezo.jpg',
+    },
   },
   ldr: {
     name: { fr: 'Photorésistance (LDR)', ar: 'مقاومة ضوئية (LDR)' },
@@ -65,6 +109,12 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'تنخفض مقاومتها كلما زادت الإضاءة.',
     },
     color: '#c9a45c',
+    photo: {
+      src: '/components/ldr.webp',
+      author: 'Nevit Dilmen',
+      license: 'CC BY-SA 3.0',
+      source: 'https://commons.wikimedia.org/wiki/File:LDR_1480402_3_4_HDR_Enhancer.jpg',
+    },
   },
   servo: {
     name: { fr: 'Servomoteur SG90', ar: 'محرّك مؤازر SG90' },
@@ -73,6 +123,12 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'يدور إلى زاوية دقيقة من 0° إلى 180° حسب الأمر.',
     },
     color: '#3b6fb6',
+    photo: {
+      src: '/components/servo.webp',
+      author: 'Suyash Dwivedi',
+      license: 'CC BY-SA 4.0',
+      source: 'https://commons.wikimedia.org/wiki/File:Tower_Pro_SG90_micro_servo_motor.jpg',
+    },
   },
   tmp36: {
     name: { fr: 'Capteur de température TMP36', ar: 'حسّاس الحرارة TMP36' },
@@ -81,6 +137,12 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'جهد خرجه 0.5 فولت عند 0 °م ويزداد 10 ميلي فولت لكل درجة: نقرؤه بـ analogRead().',
     },
     color: '#1c1c20',
+    photo: {
+      src: '/components/tmp36.webp',
+      author: 'oomlout',
+      license: 'CC BY-SA 2.0',
+      source: 'https://commons.wikimedia.org/wiki/File:Temperature_Sensor_(TMP36).jpg',
+    },
   },
   ultrasonic: {
     name: { fr: 'Capteur à ultrasons HC-SR04', ar: 'حسّاس الموجات فوق الصوتية HC-SR04' },
@@ -89,6 +151,12 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'يرسل نبضة صوتية (TRIG) ويقيس زمن الصدى (ECHO): المسافة بالسنتيمتر = الزمن بالميكروثانية ÷ 58.',
     },
     color: '#2f6bb5',
+    photo: {
+      src: '/components/ultrasonic.webp',
+      author: 'Suyash Dwivedi',
+      license: 'CC BY-SA 4.0',
+      source: 'https://commons.wikimedia.org/wiki/File:HC_SR04_Ultrasonic_Module.jpg',
+    },
   },
   lcd: {
     name: { fr: 'Écran LCD I2C', ar: 'شاشة LCD I2C' },
@@ -97,6 +165,12 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'تعرض نصًا (سطران من 16 حرفًا) يرسله المتحكم الدقيق عبر سلكين فقط: SDA وSCL.',
     },
     color: '#274060',
+    photo: {
+      src: '/components/lcd.webp',
+      author: 'Martinwguy',
+      license: 'CC BY-SA 3.0',
+      source: 'https://commons.wikimedia.org/wiki/File:Mizar32_I2C_LCD_module_16x2.jpg',
+    },
   },
 };
 

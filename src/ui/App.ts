@@ -55,57 +55,69 @@ const TEMPLATE = `
     </div>
   </header>
 
+  <section class="welcome" aria-labelledby="welcome-title">
+    <div class="welcome-copy">
+      <span class="eyebrow" data-i18n="heroKicker">Arduino Uno · ATmega328P</span>
+      <h1 id="welcome-title"><span data-i18n="heroTitle">Apprendre</span> <em data-i18n="heroAccent">Arduino</em></h1>
+      <p class="hero-tagline" data-i18n="heroTagline">Explorer · Comprendre · Construire</p>
+    </div>
+    <div class="welcome-actions">
+      <div class="hero-cta">
+        <button class="hero-start" id="hero-start" type="button">
+          <span id="hero-start-label">Commencer</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M5 12h14M13 6l6 6-6 6"/>
+          </svg>
+        </button>
+        <button class="hero-explore" id="hero-explore" type="button" data-i18n="heroExplore">Voir les composants</button>
+      </div>
+      <div class="hero-progress">
+        <div class="hero-progress-track" aria-hidden="true"><span id="hero-progress-fill"></span></div>
+        <span><span id="hero-progress-count">0/18</span> <span data-i18n="heroProgress">leçons terminées</span></span>
+      </div>
+    </div>
+  </section>
+
   <main class="layout">
     <aside class="lesson-rail" id="lesson-rail">
       <div class="rail-head">
         <span class="eyebrow" data-i18n="course">Parcours</span>
         <span class="rail-progress" id="rail-progress">0/3</span>
       </div>
+      <div class="rail-bar" aria-hidden="true"><span id="rail-bar-fill"></span></div>
       <ol class="lesson-list" id="lesson-list"></ol>
-      <div class="rail-card">
-        <span class="eyebrow" data-i18n="comingSoon">Bientôt</span>
-        <p data-i18n="comingSoonText">Capteur de lumière, buzzer, servo…</p>
-      </div>
       <div class="rail-foot" data-i18n="footerNote"></div>
     </aside>
 
     <section class="stage" id="stage">
-      <div class="canvas-host" id="canvas-host"></div>
+      <div class="stage-view">
+        <div class="canvas-host" id="canvas-host"></div>
 
-      <div class="hero">
-        <span class="eyebrow" data-i18n="heroKicker">Arduino Uno · ATmega328P</span>
-        <h1><span data-i18n="heroTitle">Apprendre</span> <em data-i18n="heroAccent">Arduino</em></h1>
-        <p class="hero-tagline" data-i18n="heroTagline">Explorer · Comprendre · Construire</p>
-        <div class="hero-hints">
-          <span><b>⟲</b><span data-i18n="hintPan">Glisser pour déplacer</span></span>
-          <span><b>⌨</b><span data-i18n="hintRotate">Q / E pour pivoter</span></span>
-          <span><b>＋</b><span data-i18n="hintZoom">Molette pour zoomer</span></span>
+        <div class="part-card" id="part-card" hidden>
+          <button class="part-close" id="part-close" type="button" aria-label="Fermer">×</button>
+          <span class="eyebrow" data-i18n="partKicker">Composant</span>
+          <strong id="part-name"></strong>
+          <p id="part-role"></p>
         </div>
+
+        <button class="view-reset" id="reset-view" type="button" title="Recentrer la vue" aria-label="Recentrer la vue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <circle cx="12" cy="12" r="5.2"/>
+            <path d="M12 2.5v3.4M12 18.1v3.4M2.5 12h3.4M18.1 12h3.4"/>
+          </svg>
+        </button>
+
+        <button class="view-reset sound-toggle" id="sound-toggle" type="button" data-i18n-title="soundToggle" aria-pressed="false" hidden>🔊</button>
       </div>
 
-      <div class="stage-status" id="stage-status">
-        <span class="status-dot"></span>
-        <span id="stage-status-text" data-i18n="simReady">Simulateur prêt</span>
+      <div class="stage-footer">
+        <div class="stage-status" id="stage-status">
+          <span class="status-dot"></span>
+          <span id="stage-status-text" data-i18n="simReady">Simulateur prêt</span>
+        </div>
+        <div class="stage-hint" id="stage-hint"></div>
+        <div class="stage-legend" id="stage-legend"></div>
       </div>
-
-      <div class="stage-hint" id="stage-hint"></div>
-      <div class="stage-legend" id="stage-legend"></div>
-
-      <div class="part-card" id="part-card" hidden>
-        <button class="part-close" id="part-close" type="button" aria-label="Fermer">×</button>
-        <span class="eyebrow" data-i18n="partKicker">Composant</span>
-        <strong id="part-name"></strong>
-        <p id="part-role"></p>
-      </div>
-
-      <button class="view-reset" id="reset-view" type="button" title="Recentrer la vue" aria-label="Recentrer la vue">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-          <circle cx="12" cy="12" r="5.2"/>
-          <path d="M12 2.5v3.4M12 18.1v3.4M2.5 12h3.4M18.1 12h3.4"/>
-        </svg>
-      </button>
-
-      <button class="view-reset sound-toggle" id="sound-toggle" type="button" data-i18n-title="soundToggle" aria-pressed="false" hidden>🔊</button>
     </section>
 
     <aside class="workbench" id="workbench">
@@ -196,6 +208,10 @@ const TEMPLATE = `
           <span class="complete-icon">✓</span>
           <span id="complete-label">Marquer comme terminé</span>
         </button>
+        <button class="next-btn" id="next-lesson" type="button">
+          <span data-i18n="nextLesson">Leçon suivante</span>
+          <span class="next-arrow" aria-hidden="true">→</span>
+        </button>
       </div>
     </aside>
   </main>
@@ -233,9 +249,16 @@ export class App {
   private serialFrame: number | null = null;
 
   private readonly canvasHost: HTMLElement;
+  private readonly workbench: HTMLElement;
   private readonly lessonRail: HTMLElement;
   private readonly lessonList: HTMLOListElement;
   private readonly railProgress: HTMLElement;
+  private readonly railBarFill: HTMLElement;
+  private readonly heroStartBtn: HTMLButtonElement;
+  private readonly heroStartLabel: HTMLElement;
+  private readonly heroExploreBtn: HTMLButtonElement;
+  private readonly heroProgressFill: HTMLElement;
+  private readonly heroProgressCount: HTMLElement;
   private readonly stageStatus: HTMLElement;
   private readonly stageStatusText: HTMLElement;
   private readonly stageHint: HTMLElement;
@@ -280,6 +303,7 @@ export class App {
   private readonly serialClearBtn: HTMLButtonElement;
   private readonly completeBtn: HTMLButtonElement;
   private readonly completeLabel: HTMLElement;
+  private readonly nextLessonBtn: HTMLButtonElement;
   private readonly progressRing: HTMLElement;
   private readonly progressCount: HTMLElement;
   private readonly langToggle: HTMLButtonElement;
@@ -296,9 +320,16 @@ export class App {
     root.innerHTML = TEMPLATE;
 
     this.canvasHost = this.el('canvas-host');
+    this.workbench = this.el('workbench');
     this.lessonRail = this.el('lesson-rail');
     this.lessonList = this.el<HTMLOListElement>('lesson-list');
     this.railProgress = this.el('rail-progress');
+    this.railBarFill = this.el('rail-bar-fill');
+    this.heroStartBtn = this.el<HTMLButtonElement>('hero-start');
+    this.heroStartLabel = this.el('hero-start-label');
+    this.heroExploreBtn = this.el<HTMLButtonElement>('hero-explore');
+    this.heroProgressFill = this.el('hero-progress-fill');
+    this.heroProgressCount = this.el('hero-progress-count');
     this.stageStatus = this.el('stage-status');
     this.stageStatusText = this.el('stage-status-text');
     this.stageHint = this.el('stage-hint');
@@ -340,6 +371,7 @@ export class App {
     this.serialClearBtn = this.el<HTMLButtonElement>('serial-clear');
     this.completeBtn = this.el<HTMLButtonElement>('complete-btn');
     this.completeLabel = this.el('complete-label');
+    this.nextLessonBtn = this.el<HTMLButtonElement>('next-lesson');
     this.progressRing = this.el('progress-ring');
     this.progressCount = this.el('progress-count');
     this.langToggle = this.el<HTMLButtonElement>('lang-toggle');
@@ -446,6 +478,12 @@ export class App {
       this.renderSerial();
     });
     this.completeBtn.addEventListener('click', () => this.toggleComplete());
+    this.heroStartBtn.addEventListener('click', () => this.startNextLesson());
+    this.heroExploreBtn.addEventListener('click', () => {
+      this.setNavActive(this.navComponents);
+      this.openModal();
+    });
+    this.nextLessonBtn.addEventListener('click', () => this.goToAdjacentLesson(1));
     this.resetViewBtn.addEventListener('click', () => {
       this.scene.resetView();
       this.setNavActive(this.navLab);
@@ -697,8 +735,24 @@ export class App {
       this.updateSensorUI();
     }
     this.updateCompleteButton();
+    this.updateNextButton();
 
     if (syncScene) this.scene.setLesson(lesson.highlightPins, lesson.components);
+  }
+
+  private startNextLesson(): void {
+    const next = LESSONS.find((lesson) => !this.completed.has(lesson.id)) ?? LESSONS[0];
+    if (next.id !== this.activeId) this.selectLesson(next.id);
+    if (window.matchMedia('(max-width: 1120px)').matches) {
+      this.workbench.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    this.runBtn.focus({ preventScroll: true });
+  }
+
+  private goToAdjacentLesson(direction: 1 | -1): void {
+    const index = LESSONS.findIndex((lesson) => lesson.id === this.activeId);
+    const target = LESSONS[index + direction];
+    if (target) this.selectLesson(target.id);
   }
 
   private selectLesson(id: LessonId): void {
@@ -801,13 +855,26 @@ export class App {
     this.completeLabel.textContent = done ? t(this.lang, 'completed') : t(this.lang, 'markComplete');
   }
 
+  private updateNextButton(): void {
+    const index = LESSONS.findIndex((lesson) => lesson.id === this.activeId);
+    this.nextLessonBtn.disabled = index >= LESSONS.length - 1;
+  }
+
   private updateProgress(): void {
     const count = this.completed.size;
     const total = LESSONS.length;
     const label = `${count}/${total}`;
+    const percent = `${(count / total) * 100}%`;
     this.progressCount.textContent = label;
     this.railProgress.textContent = label;
+    this.heroProgressCount.textContent = label;
     this.progressRing.style.setProperty('--p', String((count / total) * 100));
+    this.railBarFill.style.width = percent;
+    this.heroProgressFill.style.width = percent;
+    this.heroStartLabel.textContent = t(
+      this.lang,
+      count === total ? 'heroReview' : count > 0 ? 'heroContinue' : 'heroStart',
+    );
   }
 
   private updateSimState(running: boolean): void {
@@ -886,12 +953,21 @@ export class App {
 
     for (const id of ids) {
       const info = COMPONENTS[id];
-      const card = document.createElement('div');
+      const card = document.createElement('article');
       card.className = 'component-card';
 
-      const swatch = document.createElement('span');
-      swatch.className = 'component-swatch';
-      swatch.style.background = info.color;
+      const photoWrap = document.createElement('div');
+      photoWrap.className = 'component-photo';
+
+      const img = document.createElement('img');
+      img.src = info.photo.src;
+      img.alt = pick(this.lang, info.name);
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      photoWrap.append(img);
+
+      const body = document.createElement('div');
+      body.className = 'component-body';
 
       const title = document.createElement('h3');
       title.textContent = pick(this.lang, info.name);
@@ -899,7 +975,15 @@ export class App {
       const role = document.createElement('p');
       role.textContent = pick(this.lang, info.role);
 
-      card.append(swatch, title, role);
+      const credit = document.createElement('a');
+      credit.className = 'component-credit';
+      credit.href = info.photo.source;
+      credit.target = '_blank';
+      credit.rel = 'noreferrer';
+      credit.textContent = `${t(this.lang, 'photoBy')} ${info.photo.author} · ${info.photo.license}`;
+
+      body.append(title, role, credit);
+      card.append(photoWrap, body);
       this.componentGrid.append(card);
     }
   }
