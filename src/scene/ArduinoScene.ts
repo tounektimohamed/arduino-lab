@@ -80,7 +80,7 @@ function lanePoints(
 
 interface InteractiveItem {
   root: THREE.Object3D;
-  kind: 'button' | 'pot' | 'lamp';
+  kind: 'button' | 'pot' | 'lamp' | 'ball';
 }
 
 export class ArduinoScene {
@@ -108,6 +108,15 @@ export class ArduinoScene {
   private readonly servoWires = new THREE.Group();
   private readonly lcdGroup = new THREE.Group();
   private readonly lcdWires = new THREE.Group();
+  private readonly ultraGroup = new THREE.Group();
+  private readonly ultraWires = new THREE.Group();
+  private readonly ballGroup = new THREE.Group();
+  private readonly pingRings: THREE.Mesh[] = [];
+  private distanceCm = 30;
+  private pingUntil = 0;
+  private lastTime = 0;
+  private ballStartY = 0;
+  private ballStartValue = 0;
   private readonly lcdCanvas = document.createElement('canvas');
   private lcdTexture!: THREE.CanvasTexture;
   private readonly lamp = new THREE.Group();
@@ -147,7 +156,7 @@ export class ArduinoScene {
   private buttonCap!: THREE.Mesh;
   private buttonCapY = 0.2;
   private potKnob!: THREE.Group;
-  private activePointer: 'button' | 'pot' | 'lamp' | null = null;
+  private activePointer: 'button' | 'pot' | 'lamp' | 'ball' | null = null;
   private potStartX = 0;
   private potStartValue = 0;
   private disposed = false;
@@ -213,6 +222,9 @@ export class ArduinoScene {
     this.servoWires.visible = has('servo');
     this.lcdGroup.visible = has('lcd');
     this.lcdWires.visible = has('lcd');
+    this.ultraGroup.visible = has('ultrasonic');
+    this.ultraWires.visible = has('ultrasonic');
+    this.ballGroup.visible = has('ultrasonic');
     const nextTarget = this.viewTarget();
     this.camera.position.add(nextTarget.clone().sub(this.controls.target));
     this.controls.target.copy(nextTarget);
@@ -241,7 +253,7 @@ export class ArduinoScene {
   }
 
   private viewTarget(): THREE.Vector3 {
-    const near = this.activeComponents.includes('servo') || this.activeComponents.includes('lcd');
+    const near = ['servo', 'lcd', 'ultrasonic'].some((name) => this.activeComponents.includes(name));
     return vec(0.3, 0.35, near ? 1.6 : 0.25);
   }
 
@@ -692,6 +704,7 @@ export class ArduinoScene {
     this.buildLdr();
     this.buildServo();
     this.buildLcd();
+    this.buildUltrasonic();
   }
 
   private buildLed(): void {
@@ -1150,6 +1163,86 @@ export class ArduinoScene {
     this.lcdTexture.needsUpdate = true;
   }
 
+  /**
+   * HC-SR04 planté dans la platine : ses 4 broches sont en colonnes 6 à 9 (rangée 5, moitié basse),
+   * donc 4 colonnes distinctes. Les fils arrivent sur la rangée 7 (même colonne, autre rangée).
+   * La balle est suspendue à un fil : on la fait glisser pour changer la distance.
+   */
+  private buildUltrasonic(): void {
+    this.ultraGroup.position.set(holeX(7.5), BREADBOARD.h, holeZ(5));
+
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(2.25, 1.0, 0.1), std(0x1e4fa0, { roughness: 0.55 }));
+    pcb.position.y = 0.8;
+    pcb.castShadow = true;
+    this.ultraGroup.add(pcb);
+
+    const rim = std(0xbfc4ca, { metalness: 0.8, roughness: 0.3 });
+    const membrane = std(0x15171a, { roughness: 0.7 });
+    for (const x of [-0.7, 0.7]) {
+      const eye = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 28), rim);
+      eye.rotation.x = Math.PI / 2;
+      eye.position.set(x, 0.8, 0.3);
+      eye.castShadow = true;
+      this.ultraGroup.add(eye);
+      const face = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.02, 28), membrane);
+      face.rotation.x = Math.PI / 2;
+      face.position.set(x, 0.8, 0.56);
+      this.ultraGroup.add(face);
+    }
+
+    const gold = std(0xd4af37, { metalness: 0.8, roughness: 0.3 });
+    for (const dx of [-0.405, -0.135, 0.135, 0.405]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.3, 0.03), gold);
+      leg.position.set(dx, 0.15, 0);
+      this.ultraGroup.add(leg);
+    }
+
+    for (let i = 0; i < 3; i++) {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.28, 0.02, 8, 32),
+        new THREE.MeshBasicMaterial({ color: 0x6ad0ff, transparent: true, opacity: 0, depthWrite: false }),
+      );
+      ring.position.set(0, 0.8, 0.6);
+      this.ultraGroup.add(ring);
+      this.pingRings.push(ring);
+    }
+
+    this.ultraGroup.visible = false;
+    this.registerPart(this.ultraGroup, 'ultrasonic');
+    this.scene.add(this.ultraGroup);
+
+    // Balle suspendue (centre à la hauteur des yeux du capteur : y = 1.64).
+    this.ballGroup.position.x = holeX(7.5);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.4, 28, 20), std(0xf08a24, { roughness: 0.5 }));
+    ball.position.y = 1.64;
+    ball.castShadow = true;
+    this.ballGroup.add(ball);
+    const string = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 2.4, 6), std(0x4a4a4a));
+    string.position.y = 3.24;
+    this.ballGroup.add(string);
+    this.ballGroup.visible = false;
+    this.scene.add(this.ballGroup);
+    this.interactive.push({ root: this.ballGroup, kind: 'ball' });
+    this.setDistanceVisual(this.board.distanceCm);
+
+    const v = (p: { x: number; y: number; z: number }): THREE.Vector3 => vec(p.x, p.y, p.z);
+    const hole = (col: number): THREE.Vector3 => vec(holeX(col), 0.96, holeZ(7));
+    this.ultraWires.add(
+      wireMesh(archPoints(v(pinWorld('5V')), hole(6), 1.2), COLORS.red),
+      wireMesh(archPoints(v(pinWorld('A2')), hole(7), 1.6), COLORS.green),
+      wireMesh(archPoints(v(pinWorld('A3')), hole(8), 2.0), COLORS.orange),
+      wireMesh(archPoints(v(POWER_GND), hole(9), 0.9), COLORS.black),
+    );
+    this.ultraWires.visible = false;
+    this.scene.add(this.ultraWires);
+  }
+
+  /** La balle est à `cm` centimètres de la face avant du capteur (0,08 unité par cm). */
+  private setDistanceVisual(cm: number): void {
+    this.distanceCm = cm;
+    this.ballGroup.position.z = 1.05 + 0.4 + cm * 0.08;
+  }
+
   private buildExtraWires(): void {
     const v = (p: { x: number; y: number; z: number }): THREE.Vector3 => vec(p.x, p.y, p.z);
     const p8 = v(pinWorld('8'));
@@ -1243,7 +1336,7 @@ export class ArduinoScene {
   }
 
   private buildHighlights(): void {
-    for (const label of ['9', '2', 'A0', '5V', 'GND', 'GND-F', '8', '10', 'A1', 'A4', 'A5']) {
+    for (const label of ['9', '2', 'A0', '5V', 'GND', 'GND-F', '8', '10', 'A1', 'A2', 'A3', 'A4', 'A5']) {
       const pin = label === 'GND-F' ? POWER_GND : pinWorld(label);
 
       const ring = new THREE.Mesh(
@@ -1310,6 +1403,11 @@ export class ArduinoScene {
       this.lampStartY = event.clientY;
       this.lampStartValue = this.board.lightValue;
       this.renderer.domElement.style.cursor = 'ns-resize';
+    } else if (hit.kind === 'ball') {
+      this.activePointer = 'ball';
+      this.ballStartY = event.clientY;
+      this.ballStartValue = this.board.distanceCm;
+      this.renderer.domElement.style.cursor = 'ns-resize';
     } else {
       this.activePointer = 'pot';
       this.potStartX = event.clientX;
@@ -1328,10 +1426,14 @@ export class ArduinoScene {
       this.board.setLight(this.lampStartValue + (event.clientY - this.lampStartY) * 4);
       return;
     }
+    if (this.activePointer === 'ball') {
+      this.board.setDistance(this.ballStartValue + (event.clientY - this.ballStartY) * 0.2);
+      return;
+    }
     if (this.activePointer) return;
 
     const hit = this.pick(event);
-    const cursors = { pot: 'grab', button: 'pointer', lamp: 'ns-resize' } as const;
+    const cursors = { pot: 'grab', button: 'pointer', lamp: 'ns-resize', ball: 'ns-resize' } as const;
     const overPart = hit ? null : this.pickPart(event);
     this.renderer.domElement.style.cursor = hit ? cursors[hit.kind] : overPart ? 'help' : 'grab';
   };
@@ -1486,6 +1588,12 @@ export class ArduinoScene {
       case 'lcd':
         this.drawLcd(event.lines, event.backlight);
         break;
+      case 'distance':
+        this.setDistanceVisual(event.value);
+        break;
+      case 'ping':
+        this.pingUntil = this.lastTime + 0.4;
+        break;
     }
   };
 
@@ -1510,6 +1618,7 @@ export class ArduinoScene {
     if (this.disposed) return;
     const delta = Math.min(this.clock.getDelta(), 0.05);
     const time = this.clock.elapsedTime;
+    this.lastTime = time;
     this.controls.update();
 
     this.ledValue += (this.ledTarget - this.ledValue) * Math.min(1, delta * 14);
@@ -1541,6 +1650,20 @@ export class ArduinoScene {
       ring.scale.setScalar(1 + phase * 2.2);
       material.opacity = (1 - phase) * 0.7;
       material.color.setHSL(Math.min(0.85, this.toneFreq / 1400), 0.65, 0.5);
+    });
+
+    const pinging = time < this.pingUntil;
+    const travel = this.distanceCm * 0.08;
+    this.pingRings.forEach((ring, index) => {
+      const material = ring.material as THREE.MeshBasicMaterial;
+      if (!pinging) {
+        material.opacity = 0;
+        return;
+      }
+      const phase = (time * 2.2 + index / 3) % 1;
+      ring.position.z = 0.6 + phase * travel;
+      ring.scale.setScalar(1 + phase * 1.2);
+      material.opacity = (1 - phase) * 0.7;
     });
 
     const night = this.activeComponents.includes('ldr');

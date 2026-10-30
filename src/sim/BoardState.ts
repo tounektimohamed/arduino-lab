@@ -70,7 +70,9 @@ export type BoardEvent =
   | { type: 'tone'; pin: number; freq: number }
   | { type: 'servo'; pin: number; angle: number }
   | { type: 'light'; value: number }
-  | { type: 'lcd'; lines: string[]; backlight: boolean };
+  | { type: 'lcd'; lines: string[]; backlight: boolean }
+  | { type: 'distance'; value: number }
+  | { type: 'ping' };
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -82,6 +84,7 @@ export class BoardState {
   potValue = 512;
   lightValue = 650;
   servoAngle = 90;
+  distanceCm = 30;
   private toneTimer: number | null = null;
   private lcdBuffer: string[][] = [];
   lcdColumns = 16;
@@ -119,6 +122,7 @@ export class BoardState {
     this.emit({ type: 'pot', value: this.potValue });
     this.emit({ type: 'light', value: this.lightValue });
     this.emit({ type: 'servo', pin: 10, angle: 90 });
+    this.emit({ type: 'distance', value: this.distanceCm });
     this.emitLcd();
     this.emit({ type: 'tone', pin: 8, freq: 0 });
   }
@@ -240,6 +244,20 @@ export class BoardState {
   lcdBacklight(on: boolean): void {
     this.lcdBacklightOn = on;
     this.emitLcd();
+  }
+
+  /** HC-SR04 : durée de l'écho en µs (aller-retour du son : ≈ 58 µs par cm). 0 = hors de portée. */
+  pulseIn(_pin: number, state: number): number {
+    this.emit({ type: 'ping' });
+    if (state !== 1 || this.distanceCm < 2 || this.distanceCm > 400) return 0;
+    return Math.round(this.distanceCm * 58.2);
+  }
+
+  setDistance(cm: number): void {
+    const next = Math.round(clamp(cm, 2, 60));
+    if (next === this.distanceCm) return;
+    this.distanceCm = next;
+    this.emit({ type: 'distance', value: next });
   }
 
   servoWrite(pin: number, angle: number): void {

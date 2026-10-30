@@ -1,7 +1,7 @@
 import type { Localized } from '../i18n';
 
-export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd';
-export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd';
+export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd' | 'distance';
+export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd' | 'ultrasonic';
 
 export interface ComponentInfo {
   name: Localized;
@@ -73,6 +73,14 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       ar: 'يدور إلى زاوية دقيقة من 0° إلى 180° حسب الأمر.',
     },
     color: '#3b6fb6',
+  },
+  ultrasonic: {
+    name: { fr: 'Capteur à ultrasons HC-SR04', ar: 'حسّاس الموجات فوق الصوتية HC-SR04' },
+    role: {
+      fr: 'Envoie une impulsion sonore (TRIG) et mesure le temps de l’écho (ECHO) : distance en cm = temps en µs ÷ 58.',
+      ar: 'يرسل نبضة صوتية (TRIG) ويقيس زمن الصدى (ECHO): المسافة بالسنتيمتر = الزمن بالميكروثانية ÷ 58.',
+    },
+    color: '#2f6bb5',
   },
   lcd: {
     name: { fr: 'Écran LCD I2C', ar: 'شاشة LCD I2C' },
@@ -636,6 +644,36 @@ void loop() {
     code: `// Leçon 16 — afficher sur l’écran LCD\n#include <Wire.h>\n#include <LiquidCrystal_I2C.h>\n\nLiquidCrystal_I2C lcd(0x27, 16, 2);\n\nint compteur = 0;\n\nvoid setup() {\n  lcd.init();\n  lcd.backlight();\n}\n\nvoid loop() {\n  lcd.setCursor(0, 0);\n  lcd.print("Arduino Lab");\n\n  lcd.setCursor(0, 1);\n  lcd.print("Compteur : ");\n  lcd.print(compteur);\n\n  compteur++;\n  delay(500);\n}\n`,
     components: ['lcd', 'wires'],
     highlightPins: ['A4', 'A5', '5V', 'GND-F'],
+  },
+  {
+    id: 'distance',
+    title: { fr: 'Radar de distance', ar: 'رادار قياس المسافة' },
+    tagline: { fr: 'Un capteur à ultrasons mesure une balle et l’écran LCD affiche la distance.', ar: 'حسّاس فوق صوتي يقيس مسافة كرة وشاشة LCD تعرضها.' },
+    duration: 18,
+    level: { fr: 'Avancé', ar: 'متقدم' },
+    description: {
+      fr: 'Le HC-SR04 émet un « bip » ultrasonore quand TRIG passe à HIGH pendant 10 µs, puis ECHO reste à HIGH le temps que le son fasse l’aller-retour. pulseIn() mesure cette durée en microsecondes ; en la divisant par 58 on obtient la distance en centimètres, affichée sur l’écran LCD. Faites glisser la balle dans la scène.',
+      ar: 'يُصدر HC-SR04 «صفيرًا» فوق صوتي عندما يصبح TRIG في الحالة HIGH لمدة 10 ميكروثانية، ثم يبقى ECHO في HIGH طوال ذهاب الصوت وإيابه. تقيس pulseIn() هذه المدة بالميكروثانية، وبقسمتها على 58 نحصل على المسافة بالسنتيمتر وتُعرض على شاشة LCD. اسحب الكرة في المشهد.',
+    },
+    objectives: {
+      fr: ['Déclencher une mesure avec TRIG (impulsion de 10 µs).', 'Mesurer l’écho avec pulseIn().', 'Convertir un temps en distance et l’afficher sur le LCD.'],
+      ar: ['بدء القياس بـ TRIG (نبضة 10 ميكروثانية).', 'قياس الصدى بـ pulseIn().', 'تحويل الزمن إلى مسافة وعرضها على الشاشة.'],
+    },
+    wiring: {
+      fr: ['HC-SR04 : VCC → 5V, TRIG → A2, ECHO → A3, GND → GND.', 'LCD I2C : VCC → 5V, GND → GND, SDA → A4, SCL → A5.'],
+      ar: ['HC-SR04: ‏VCC ← 5V، وTRIG ← A2، وECHO ← A3، وGND ← GND.', 'شاشة LCD I2C: ‏VCC ← 5V، وGND ← GND، وSDA ← A4، وSCL ← A5.'],
+    },
+    challenge: {
+      fr: 'Affichez « Trop pres ! » sur la 2e ligne quand la balle est à moins de 10 cm.',
+      ar: 'اعرض «Trop pres !» في السطر الثاني عندما تكون الكرة على بعد أقل من 10 سم.',
+    },
+    hint: {
+      fr: 'Lancez le code puis faites glisser la balle : la distance change sur l’écran.',
+      ar: 'شغّل الكود ثم اسحب الكرة: تتغيّر المسافة على الشاشة.',
+    },
+    code: `// Leçon 17 — radar de distance\n#include <Wire.h>\n#include <LiquidCrystal_I2C.h>\n\nLiquidCrystal_I2C lcd(0x27, 16, 2);\n\nconst int TRIG = A2;\nconst int ECHO = A3;\n\nvoid setup() {\n  pinMode(TRIG, OUTPUT);\n  pinMode(ECHO, INPUT);\n  lcd.init();\n  lcd.backlight();\n}\n\nvoid loop() {\n  digitalWrite(TRIG, LOW);\n  delayMicroseconds(2);\n  digitalWrite(TRIG, HIGH);\n  delayMicroseconds(10);\n  digitalWrite(TRIG, LOW);\n\n  int duree = pulseIn(ECHO, HIGH);\n  int distance = round(duree / 58.0);\n\n  lcd.setCursor(0, 0);\n  lcd.print(\"Distance :\");\n  lcd.setCursor(0, 1);\n  lcd.print(distance);\n  lcd.print(\" cm   \");\n\n  delay(200);\n}\n`,
+    components: ['ultrasonic', 'lcd', 'wires'],
+    highlightPins: ['A2', 'A3', 'A4', 'A5', '5V', 'GND-F'],
   },
 ];
 

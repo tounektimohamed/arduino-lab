@@ -215,7 +215,7 @@ export class App {
   private readonly audio = new AudioEngine();
   private toneFreq = 0;
   private selectedPart: string | null = null;
-  private sensorKind: 'light' | 'servo' | 'buzzer' | null = null;
+  private sensorKind: 'light' | 'distance' | 'servo' | 'buzzer' | null = null;
   private readonly codes = Object.fromEntries(
     LESSONS.map((lesson) => [lesson.id, lesson.code]),
   ) as Record<LessonId, string>;
@@ -447,7 +447,9 @@ export class App {
     });
 
     this.sensorSlider.addEventListener('input', () => {
-      this.sim.board.setLight(Number(this.sensorSlider.value));
+      const value = Number(this.sensorSlider.value);
+      if (this.sensorKind === 'distance') this.sim.board.setDistance(value);
+      else this.sim.board.setLight(value);
     });
     this.soundToggle.addEventListener('click', () => {
       const muted = this.audio.toggle();
@@ -497,8 +499,9 @@ export class App {
         this.toneFreq = event.freq;
         this.audio.setTone(event.freq);
       }
-      if (event.type === 'light') this.sensorSlider.value = String(event.value);
-      if (event.type === 'tone' || event.type === 'light' || event.type === 'servo') {
+      if (event.type === 'light' && this.sensorKind === 'light') this.sensorSlider.value = String(event.value);
+      if (event.type === 'distance' && this.sensorKind === 'distance') this.sensorSlider.value = String(event.value);
+      if (event.type === 'tone' || event.type === 'light' || event.type === 'servo' || event.type === 'distance') {
         this.updateSensorUI();
       }
     });
@@ -619,13 +622,26 @@ export class App {
     this.potControl.hidden = !has('pot');
     const sensors = {
       light: ['lightLabel', 'lightHint'],
+      distance: ['distLabel', 'distHint'],
       servo: ['servoLabel', 'servoHint'],
       buzzer: ['toneLabel', 'toneHint'],
     } as const;
-    this.sensorKind = has('ldr') ? 'light' : has('servo') ? 'servo' : has('buzzer') ? 'buzzer' : null;
+    this.sensorKind = has('ldr')
+      ? 'light'
+      : has('ultrasonic')
+        ? 'distance'
+        : has('servo')
+          ? 'servo'
+          : has('buzzer')
+            ? 'buzzer'
+            : null;
     const sensor = this.sensorKind ? sensors[this.sensorKind] : null;
     this.sensorControl.hidden = sensor === null;
-    this.sensorSlider.hidden = this.sensorKind !== 'light';
+    this.sensorSlider.hidden = this.sensorKind !== 'light' && this.sensorKind !== 'distance';
+    const isDistance = this.sensorKind === 'distance';
+    this.sensorSlider.min = isDistance ? '2' : '0';
+    this.sensorSlider.max = isDistance ? '60' : '1023';
+    this.sensorSlider.value = String(isDistance ? this.sim.board.distanceCm : this.sim.board.lightValue);
     this.soundToggle.hidden = !has('buzzer');
     if (sensor) {
       this.sensorLabel.textContent = t(this.lang, sensor[0]);
@@ -728,6 +744,7 @@ export class App {
   private updateSensorUI(): void {
     const board = this.sim.board;
     if (this.sensorKind === 'light') this.sensorValue.textContent = String(board.lightValue);
+    else if (this.sensorKind === 'distance') this.sensorValue.textContent = `${board.distanceCm} cm`;
     else if (this.sensorKind === 'servo') this.sensorValue.textContent = `${board.servoAngle}°`;
     else if (this.sensorKind === 'buzzer') {
       this.sensorValue.textContent = this.toneFreq > 0 ? `${this.toneFreq} Hz` : '—';
@@ -778,7 +795,7 @@ export class App {
   }
 
   private renderComponentsModal(): void {
-    const ids: ComponentId[] = ['led', 'resistor', 'button', 'pot', 'buzzer', 'ldr', 'servo', 'lcd', 'wires'];
+    const ids: ComponentId[] = ['led', 'resistor', 'button', 'pot', 'buzzer', 'ldr', 'servo', 'ultrasonic', 'lcd', 'wires'];
     this.componentGrid.replaceChildren();
 
     for (const id of ids) {

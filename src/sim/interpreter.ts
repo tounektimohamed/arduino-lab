@@ -34,6 +34,7 @@ export interface ArduinoRuntime {
   lcdSetCursor(column: number, row: number): void;
   lcdPrint(text: string, newline?: boolean): void;
   lcdBacklight(on: boolean): void;
+  pulseIn(pin: number, state: number): number;
 }
 
 type TokenType = 'num' | 'str' | 'id' | 'op' | 'eof';
@@ -912,6 +913,8 @@ class Executor {
       case 'delayMicroseconds':
         await this.runtime.delay(Math.max(0, arg(0)) / 1000);
         return 0;
+      case 'pulseIn':
+        return this.runtime.pulseIn(arg(0), arg(1));
       case 'millis':
         return this.runtime.millis();
       case 'micros':

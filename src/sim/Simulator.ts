@@ -90,6 +90,7 @@ export class Simulator {
       lcdSetCursor: (column, row) => board.lcdSetCursor(column, row),
       lcdPrint: (text, newline) => board.lcdPrint(text, newline ?? false),
       lcdBacklight: (on) => board.lcdBacklight(on),
+      pulseIn: (pin, state) => board.pulseIn(pin, state),
     };
   }
 

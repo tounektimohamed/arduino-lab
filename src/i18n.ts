@@ -110,6 +110,11 @@ export const ui = {
     ar: 'فعّل الصوت بزرّ مكبّر الصوت أسفل المشهد.',
   },
   soundToggle: { fr: 'Activer / couper le son', ar: 'تشغيل / كتم الصوت' },
+  distLabel: { fr: 'Distance de la balle', ar: 'مسافة الكرة' },
+  distHint: {
+    fr: 'Faites glisser la balle dans la scène, ou ce curseur.',
+    ar: 'اسحب الكرة في المشهد أو هذا المنزلق.',
+  },
   partKicker: { fr: 'Composant', ar: 'مكوّن' },
   partHint: { fr: 'Cliquez sur une pièce de la carte', ar: 'انقر على أي قطعة من اللوحة' },
   progress: { fr: 'progression', ar: 'التقدّم' },
