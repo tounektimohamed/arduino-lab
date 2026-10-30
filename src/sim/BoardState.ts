@@ -82,6 +82,13 @@ export class BoardState {
   lightValue = 650;
   servoAngle = 90;
   private toneTimer: number | null = null;
+  private lcdText = '';
+  lcdColumns = 16;
+  lcdRows = 2;
+  lcdAddress = 39;
+  lcdBacklightOn = true;
+  lcdColumn = 0;
+  lcdRow = 0;
 
   private modes = new Map<number, PinMode>();
   private outputs = new Map<number, number>();
@@ -100,6 +107,13 @@ export class BoardState {
     this.buttonPressed = false;
     this.clearToneTimer();
     this.servoAngle = 90;
+    this.lcdText = '';
+    this.lcdColumns = 16;
+    this.lcdRows = 2;
+    this.lcdAddress = 39;
+    this.lcdBacklightOn = true;
+    this.lcdColumn = 0;
+    this.lcdRow = 0;
     this.emit({ type: 'reset' });
     this.emit({ type: 'pot', value: this.potValue });
     this.emit({ type: 'light', value: this.lightValue });
@@ -167,6 +181,38 @@ export class BoardState {
   noTone(pin: number): void {
     this.clearToneTimer();
     this.emit({ type: 'tone', pin, freq: 0 });
+  }
+
+  lcdBegin(address: number, columns: number, rows: number): void {
+    this.lcdAddress = address;
+    this.lcdColumns = columns;
+    this.lcdRows = rows;
+    this.lcdColumn = 0;
+    this.lcdRow = 0;
+  }
+
+  lcdClear(): void {
+    this.lcdText = '';
+    this.lcdColumn = 0;
+    this.lcdRow = 0;
+  }
+
+  lcdHome(): void {
+    this.lcdColumn = 0;
+    this.lcdRow = 0;
+  }
+
+  lcdSetCursor(column: number, row: number): void {
+    this.lcdColumn = column;
+    this.lcdRow = row;
+  }
+
+  lcdPrint(text: string, newline: boolean = false): void {
+    this.lcdText = newline ? `${this.lcdText}${text}\n` : `${this.lcdText}${text}`;
+  }
+
+  lcdBacklight(on: boolean): void {
+    this.lcdBacklightOn = on;
   }
 
   servoWrite(pin: number, angle: number): void {

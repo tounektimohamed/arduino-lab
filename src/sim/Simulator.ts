@@ -84,6 +84,12 @@ export class Simulator {
       millis: () => Math.round(performance.now() - startedAt),
       serialBegin: () => undefined,
       serialPrint: (text, newline) => board.serial.write(text, newline),
+      lcdBegin: (address, columns, rows) => board.lcdBegin(address, columns, rows),
+      lcdClear: () => board.lcdClear(),
+      lcdHome: () => board.lcdHome(),
+      lcdSetCursor: (column, row) => board.lcdSetCursor(column, row),
+      lcdPrint: (text, newline) => board.lcdPrint(text, newline ?? false),
+      lcdBacklight: (on) => board.lcdBacklight(on),
     };
   }
 

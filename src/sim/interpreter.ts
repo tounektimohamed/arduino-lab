@@ -28,6 +28,12 @@ export interface ArduinoRuntime {
   millis(): number;
   serialBegin(baud: number): void;
   serialPrint(text: string, newline: boolean): void;
+  lcdBegin(address: number, columns: number, rows: number): void;
+  lcdClear(): void;
+  lcdHome(): void;
+  lcdSetCursor(column: number, row: number): void;
+  lcdPrint(text: string, newline?: boolean): void;
+  lcdBacklight(on: boolean): void;
 }
 
 type TokenType = 'num' | 'str' | 'id' | 'op' | 'eof';
@@ -876,6 +882,24 @@ class Executor {
         return 0;
       case 'noTone':
         this.runtime.noTone(arg(0));
+        return 0;
+      case 'lcdBegin':
+        this.runtime.lcdBegin(arg(0), arg(1), arg(2));
+        return 0;
+      case 'lcdClear':
+        this.runtime.lcdClear();
+        return 0;
+      case 'lcdHome':
+        this.runtime.lcdHome();
+        return 0;
+      case 'lcdSetCursor':
+        this.runtime.lcdSetCursor(arg(0), arg(1));
+        return 0;
+      case 'lcdPrint':
+        this.runtime.lcdPrint(String(args[0]), Boolean(args[1]));
+        return 0;
+      case 'lcdBacklight':
+        this.runtime.lcdBacklight(Boolean(args[0]));
         return 0;
       case 'random':
         return args.length > 1
