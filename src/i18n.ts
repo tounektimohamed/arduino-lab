@@ -123,6 +123,13 @@ export const ui = {
   partKicker: { fr: 'Composant', ar: 'مكوّن' },
   partHint: { fr: 'Cliquez sur une pièce de la carte', ar: 'انقر على أي قطعة من اللوحة' },
   progress: { fr: 'progression', ar: 'التقدّم' },
+  modeBlocks: { fr: '🧩 Blocs', ar: '🧩 بلوكات' },
+  modeCode: { fr: '{ } Code', ar: '{ } كود' },
+  blocksEmpty: { fr: 'Glissez des blocs ici', ar: 'اسحب البلوكات إلى هنا' },
+  blocksManual: {
+    fr: 'Le code a été modifié à la main. « Lancer » exécute les blocs ; modifier un bloc remplacera ce code.',
+    ar: 'تم تعديل الكود يدويًا. زرّ «تشغيل» ينفّذ البلوكات، وتعديل أي بلوك سيستبدل هذا الكود.',
+  },
   footerNote: {
     fr: 'Un labo d’électronique original, inspiré des bases de l’Arduino.',
     ar: 'مختبر إلكترونيات أصلي، مستوحى من أساسيات أردوينو.',

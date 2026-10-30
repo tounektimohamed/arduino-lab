@@ -5,6 +5,7 @@ import '@fontsource/cairo/400.css';
 import '@fontsource/cairo/600.css';
 import '@fontsource/cairo/700.css';
 import './styles.css';
+import './blocks/blocks.css';
 import { App } from './ui/App';
 
 const root = document.getElementById('app');

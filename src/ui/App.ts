@@ -6,6 +6,8 @@ import {
   type ComponentId,
   type LessonId,
 } from '../data/lessons';
+import { BlockEditor } from '../blocks/BlockEditor';
+import { starterFor } from '../blocks/definitions';
 import { getPartInfo } from '../data/parts';
 import { pick, t, ui, type Lang, type UIKey } from '../i18n';
 import { ArduinoScene } from '../scene/ArduinoScene';
@@ -157,6 +159,10 @@ const TEMPLATE = `
       </div>
 
       <div class="editor-card">
+        <div class="mode-tabs" role="tablist">
+          <button class="mode-tab" id="tab-blocks" type="button" role="tab" data-mode="blocks" data-i18n="modeBlocks">🧩 Blocs</button>
+          <button class="mode-tab" id="tab-code" type="button" role="tab" data-mode="code" data-i18n="modeCode">{ } Code</button>
+        </div>
         <div class="editor-bar">
           <span class="file-pill"><span class="file-dot"></span>sketch.ino</span>
           <div class="editor-actions">
@@ -167,6 +173,8 @@ const TEMPLATE = `
             </button>
           </div>
         </div>
+        <p class="bk-hint" id="blocks-hint" data-i18n="blocksManual" hidden></p>
+        <div id="blocks-host" hidden></div>
         <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Code Arduino"></textarea>
         <div class="serial">
           <div class="serial-head">
@@ -209,7 +217,7 @@ export class App {
   private readonly sim = new Simulator();
   private readonly scene: ArduinoScene;
 
-  private lang: Lang = 'fr';
+  private lang: Lang = 'ar';
   private activeId: LessonId = 'blink';
   private readonly completed = new Set<LessonId>();
   private readonly audio = new AudioEngine();
@@ -258,6 +266,10 @@ export class App {
   private readonly soundToggle: HTMLButtonElement;
 
   private readonly codeEl: HTMLTextAreaElement;
+  private readonly blocks: BlockEditor;
+  private mode: 'blocks' | 'code' = 'blocks';
+  private blockStates: Record<string, unknown> = {};
+  private readonly manualEdits = new Set<LessonId>();
   private readonly runBtn: HTMLButtonElement;
   private readonly runIcon: HTMLElement;
   private readonly runLabel: HTMLElement;
@@ -317,6 +329,7 @@ export class App {
     this.soundToggle = this.el<HTMLButtonElement>('sound-toggle');
 
     this.codeEl = this.el<HTMLTextAreaElement>('code');
+    this.blocks = new BlockEditor(this.el('blocks-host'), () => this.onBlocksChange());
     this.runBtn = this.el<HTMLButtonElement>('run-btn');
     this.runIcon = this.el('run-icon');
     this.runLabel = this.el('run-label');
@@ -345,6 +358,8 @@ export class App {
     this.applyLanguage();
 
     this.codeEl.value = this.codes[this.activeId];
+    this.blocks.load(this.blockStates[this.activeId] ?? starterFor(this.activeId));
+    this.setMode(this.mode, false);
     this.updateLessonContent(true);
     this.updateProgress();
     this.updatePotUI(this.sim.board.potValue);
@@ -359,7 +374,7 @@ export class App {
 
   private loadState(): void {
     try {
-      const storedLang = localStorage.getItem('arduino-lab:lang');
+      const storedLang = localStorage.getItem('arduino-lab:lang-v2');
       if (storedLang === 'fr' || storedLang === 'ar') this.lang = storedLang;
 
       const storedLesson = localStorage.getItem('arduino-lab:lesson');
@@ -373,6 +388,15 @@ export class App {
             if (isLessonId(item)) this.completed.add(item);
           }
         }
+      }
+
+      const storedMode = localStorage.getItem('arduino-lab:mode');
+      if (storedMode === 'blocks' || storedMode === 'code') this.mode = storedMode;
+
+      const blocks = localStorage.getItem('arduino-lab:blocks');
+      if (blocks) {
+        const parsed: unknown = JSON.parse(blocks);
+        if (parsed && typeof parsed === 'object') this.blockStates = parsed as Record<string, unknown>;
       }
 
       const codes = localStorage.getItem('arduino-lab:codes');
@@ -393,10 +417,13 @@ export class App {
 
   private persist(): void {
     try {
-      localStorage.setItem('arduino-lab:lang', this.lang);
+      localStorage.setItem('arduino-lab:lang-v2', this.lang);
       localStorage.setItem('arduino-lab:lesson', this.activeId);
       localStorage.setItem('arduino-lab:progress', JSON.stringify([...this.completed]));
       localStorage.setItem('arduino-lab:codes', JSON.stringify(this.codes));
+      localStorage.setItem('arduino-lab:mode', this.mode);
+      this.blockStates[this.activeId] = this.blocks.serialize();
+      localStorage.setItem('arduino-lab:blocks', JSON.stringify(this.blockStates));
     } catch {
       // Stockage indisponible : le labo reste utilisable.
     }
@@ -469,7 +496,12 @@ export class App {
       if (isLessonId(id)) this.selectLesson(id);
     });
 
+    document.querySelectorAll<HTMLButtonElement>('.mode-tab').forEach((tab) => {
+      tab.addEventListener('click', () => this.setMode(tab.dataset.mode === 'code' ? 'code' : 'blocks'));
+    });
+
     this.codeEl.addEventListener('input', () => {
+      this.manualEdits.add(this.activeId);
       this.codes[this.activeId] = this.codeEl.value;
       this.schedulePersist();
     });
@@ -529,6 +561,7 @@ export class App {
       if (key && key in ui) element.title = t(this.lang, key as UIKey);
     });
 
+    this.blocks.setLang(this.lang, t(this.lang, 'blocksEmpty'));
     this.renderLessonList();
     this.updateLessonContent(false);
     this.renderComponentsModal();
@@ -678,9 +711,13 @@ export class App {
     this.sim.board.setButton(false);
     this.sim.board.reset();
 
+    this.blockStates[this.activeId] = this.blocks.serialize();
+
     this.activeId = id;
     this.hasRun = false;
     this.codeEl.value = this.codes[id];
+    this.blocks.load(this.blockStates[id] ?? starterFor(id));
+    this.updateModeUI();
 
     this.renderLessonList();
     this.updateLessonContent(true);
@@ -702,14 +739,46 @@ export class App {
     this.hasRun = true;
     this.sim.board.serial.clear();
     this.sim.board.serial.system(t(this.lang, 'uploading'));
-    void this.sim.start(this.codes[this.activeId]);
+    // En mode « Blocs », on exécute le programme généré par les blocs.
+    void this.sim.start(this.mode === 'blocks' ? this.blocks.getCode() : this.codes[this.activeId]);
   }
 
   private restoreCode(): void {
     const lesson = getLesson(this.activeId);
     this.codes[this.activeId] = lesson.code;
     this.codeEl.value = lesson.code;
+    this.manualEdits.delete(this.activeId);
+    this.blocks.load(starterFor(this.activeId));
+    this.updateModeUI();
     this.persist();
+  }
+
+  /** Les blocs ont changé : on régénère le code Arduino correspondant. */
+  private onBlocksChange(): void {
+    const code = this.blocks.getCode();
+    this.codeEl.value = code;
+    this.codes[this.activeId] = code;
+    this.manualEdits.delete(this.activeId);
+    this.updateModeUI();
+    this.schedulePersist();
+  }
+
+  private setMode(mode: 'blocks' | 'code', persist = true): void {
+    this.mode = mode;
+    this.updateModeUI();
+    if (persist) this.persist();
+  }
+
+  private updateModeUI(): void {
+    const isBlocks = this.mode === 'blocks';
+    this.el('blocks-host').hidden = !isBlocks;
+    this.codeEl.hidden = isBlocks;
+    this.el('blocks-hint').hidden = !(isBlocks && this.manualEdits.has(this.activeId));
+    document.querySelectorAll<HTMLElement>('.mode-tab').forEach((tab) => {
+      const active = tab.dataset.mode === this.mode;
+      tab.classList.toggle('is-active', active);
+      tab.setAttribute('aria-selected', String(active));
+    });
   }
 
   private toggleComplete(): void {
