@@ -6,6 +6,7 @@ interface Ctx {
   lcd: boolean;
   serial: boolean;
   loops: number;
+  ultra: { trig: string; echo: string } | null;
 }
 
 const LOOP_NAMES = ['i', 'j', 'k', 'l', 'm'];
@@ -50,6 +51,8 @@ function expr(b: Block, ctx: Ctx): string {
       return `(digitalRead(${sel(b, 'pin')}) == ${sel(b, 'level')})`;
     case 'millis':
       return 'millis()';
+    case 'temp':
+      return `round((analogRead(${sel(b, 'pin')}) * 5.0 / 1023.0 - 0.5) * 100.0)`;
     case 'var': {
       const name = sel(b, 'name');
       ctx.vars.add(name);
@@ -119,6 +122,34 @@ function stmt(b: Block, ctx: Ctx, ind: string): string[] {
       return [`${ind}break;`];
     case 'tone':
       return [`${ind}tone(${sel(b, 'pin')}, ${val(b, 'f', ctx)}, ${val(b, 'ms', ctx)});`];
+    case 'note':
+      return [
+        `${ind}tone(${sel(b, 'pin')}, ${val(b, 'f', ctx)}, ${val(b, 'ms', ctx)});`,
+        `${ind}delay(${val(b, 'ms', ctx)} + 60);`,
+      ];
+    case 'tone_on':
+      return [`${ind}tone(${sel(b, 'pin')}, ${val(b, 'f', ctx)});`];
+    case 'ultra': {
+      const name = sel(b, 'name');
+      const trig = sel(b, 'trig');
+      const echo = sel(b, 'echo');
+      ctx.vars.add(name);
+      ctx.ultra ??= { trig, echo };
+      return [
+        `${ind}digitalWrite(${trig}, LOW);`,
+        `${ind}delayMicroseconds(2);`,
+        `${ind}digitalWrite(${trig}, HIGH);`,
+        `${ind}delayMicroseconds(10);`,
+        `${ind}digitalWrite(${trig}, LOW);`,
+        `${ind}${name} = round(pulseIn(${echo}, HIGH) / 58.0);`,
+      ];
+    }
+    case 'print':
+      ctx.serial = true;
+      return [`${ind}Serial.print("${text(b.vals.text)}");`];
+    case 'printval':
+      ctx.serial = true;
+      return [`${ind}Serial.print(${val(b, 'v', ctx)});`];
     case 'notone':
       return [`${ind}noTone(${sel(b, 'pin')});`];
     case 'say':
@@ -156,7 +187,7 @@ function stmt(b: Block, ctx: Ctx, ind: string): string[] {
 
 /** Transforme l'espace de travail en code Arduino (C++) exécutable par le simulateur. */
 export function generateCode(ws: Workspace): string {
-  const ctx: Ctx = { vars: new Set(), servoPin: null, lcd: false, serial: false, loops: 0 };
+  const ctx: Ctx = { vars: new Set(), servoPin: null, lcd: false, serial: false, loops: 0, ultra: null };
   const setupBody = body(ws.setup, ctx, '  ');
   ctx.loops = 0;
   const loopBody = body(ws.loop, ctx, '  ');
@@ -173,6 +204,7 @@ export function generateCode(ws: Workspace): string {
   const init: string[] = [];
   if (ctx.serial) init.push('  Serial.begin(9600);');
   if (ctx.servoPin !== null) init.push(`  bras.attach(${ctx.servoPin});`);
+  if (ctx.ultra) init.push(`  pinMode(${ctx.ultra.trig}, OUTPUT);`, `  pinMode(${ctx.ultra.echo}, INPUT);`);
   if (ctx.lcd) init.push('  lcd.init();', '  lcd.backlight();');
 
   return [

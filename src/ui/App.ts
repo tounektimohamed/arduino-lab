@@ -7,7 +7,7 @@ import {
   type LessonId,
 } from '../data/lessons';
 import { BlockEditor } from '../blocks/BlockEditor';
-import { starterFor } from '../blocks/definitions';
+import { starterFor } from '../blocks/starters';
 import { getPartInfo } from '../data/parts';
 import { pick, t, ui, type Lang, type UIKey } from '../i18n';
 import { ArduinoScene } from '../scene/ArduinoScene';
@@ -267,7 +267,7 @@ export class App {
 
   private readonly codeEl: HTMLTextAreaElement;
   private readonly blocks: BlockEditor;
-  private mode: 'blocks' | 'code' = 'blocks';
+  private mode: 'blocks' | 'code' = 'code';
   private blockStates: Record<string, unknown> = {};
   private readonly manualEdits = new Set<LessonId>();
   private readonly runBtn: HTMLButtonElement;
@@ -393,7 +393,7 @@ export class App {
       const storedMode = localStorage.getItem('arduino-lab:mode');
       if (storedMode === 'blocks' || storedMode === 'code') this.mode = storedMode;
 
-      const blocks = localStorage.getItem('arduino-lab:blocks');
+      const blocks = localStorage.getItem('arduino-lab:blocks-v2');
       if (blocks) {
         const parsed: unknown = JSON.parse(blocks);
         if (parsed && typeof parsed === 'object') this.blockStates = parsed as Record<string, unknown>;
@@ -423,7 +423,7 @@ export class App {
       localStorage.setItem('arduino-lab:codes', JSON.stringify(this.codes));
       localStorage.setItem('arduino-lab:mode', this.mode);
       this.blockStates[this.activeId] = this.blocks.serialize();
-      localStorage.setItem('arduino-lab:blocks', JSON.stringify(this.blockStates));
+      localStorage.setItem('arduino-lab:blocks-v2', JSON.stringify(this.blockStates));
     } catch {
       // Stockage indisponible : le labo reste utilisable.
     }
@@ -739,8 +739,9 @@ export class App {
     this.hasRun = true;
     this.sim.board.serial.clear();
     this.sim.board.serial.system(t(this.lang, 'uploading'));
-    // En mode « Blocs », on exécute le programme généré par les blocs.
-    void this.sim.start(this.mode === 'blocks' ? this.blocks.getCode() : this.codes[this.activeId]);
+    // Le code affiché dans l'onglet « Code » est toujours celui qui s'exécute
+    // (il est régénéré automatiquement quand on modifie les blocs).
+    void this.sim.start(this.codes[this.activeId]);
   }
 
   private restoreCode(): void {

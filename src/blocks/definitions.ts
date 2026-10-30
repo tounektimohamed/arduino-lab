@@ -60,6 +60,10 @@ const VARS: Opt[] = [
   ['valeur', 'valeur', 'قيمة'],
   ['score', 'score', 'نقاط'],
   ['temps', 'temps', 'وقت'],
+  ['angle', 'angle', 'زاوية'],
+  ['etat', 'état', 'حالة'],
+  ['dernier', 'dernier état', 'الحالة السابقة'],
+  ['freq', 'fréquence', 'تردد'],
 ];
 
 const T = (fr: string, ar: string): Part => ({ k: 't', fr, ar });
@@ -90,10 +94,14 @@ export const DEFS: Def[] = [
 
   // ------------------------------------------------------------------ son
   { type: 'tone', cat: 'sound', kind: 'stmt', parts: [T('jouer broche', 'شغّل نغمة المنفذ'), SEL('pin', DIGITAL, '8'), N('f', '440'), T('Hz pendant', 'هرتز لمدة'), N('ms', '200'), T('ms', 'م.ث')] },
+  { type: 'note', cat: 'sound', kind: 'stmt', parts: [T('jouer note broche', 'شغّل نغمة المنفذ'), SEL('pin', DIGITAL, '8'), N('f', '440'), T('Hz,', 'هرتز،'), N('ms', '200'), T('ms + pause', 'م.ث + توقّف'), ] },
+  { type: 'tone_on', cat: 'sound', kind: 'stmt', parts: [T('jouer en continu broche', 'شغّل باستمرار المنفذ'), SEL('pin', DIGITAL, '8'), N('f', '440'), T('Hz', 'هرتز')] },
   { type: 'notone', cat: 'sound', kind: 'stmt', parts: [T('couper le son broche', 'أوقف الصوت المنفذ'), SEL('pin', DIGITAL, '8')] },
 
   // ------------------------------------------------------------- affichage
   { type: 'say', cat: 'display', kind: 'stmt', parts: [T('moniteur série : écrire', 'المراقب: اكتب'), S('text', 'Bonjour')] },
+  { type: 'print', cat: 'display', kind: 'stmt', parts: [T('moniteur : écrire (même ligne)', 'المراقب: اكتب (في نفس السطر)'), S('text', 'Valeur : ')] },
+  { type: 'printval', cat: 'display', kind: 'stmt', parts: [T('moniteur : valeur (même ligne)', 'المراقب: القيمة (في نفس السطر)'), N('v', '0')] },
   { type: 'sayval', cat: 'display', kind: 'stmt', parts: [T('moniteur série : valeur', 'المراقب: القيمة'), N('v', '0')] },
   { type: 'lcd_clear', cat: 'display', kind: 'stmt', parts: [T('LCD : effacer', 'LCD: امسح الشاشة')] },
   { type: 'lcd_cursor', cat: 'display', kind: 'stmt', parts: [T('LCD : colonne', 'LCD: العمود'), N('c', '0'), T('ligne', 'السطر'), N('r', '0')] },
@@ -104,6 +112,8 @@ export const DEFS: Def[] = [
   { type: 'read_digital', cat: 'sensing', kind: 'num', parts: [T('lire broche', 'اقرأ المنفذ'), SEL('pin', DIGITAL, '2')] },
   { type: 'read_analog', cat: 'sensing', kind: 'num', parts: [T('lire analogique', 'اقرأ التماثلي'), SEL('pin', ANALOG, 'A0')] },
   { type: 'pin_is', cat: 'sensing', kind: 'bool', parts: [T('broche', 'المنفذ'), SEL('pin', DIGITAL, '2'), T('est', 'هو'), SEL('level', LEVEL, 'HIGH')] },
+  { type: 'ultra', cat: 'sensing', kind: 'stmt', parts: [T('mesurer la distance (cm) →', 'قِس المسافة (سم) ←'), SEL('name', VARS, 'valeur'), T('TRIG', 'TRIG'), SEL('trig', ANALOG, 'A2'), T('ECHO', 'ECHO'), SEL('echo', ANALOG, 'A3')] },
+  { type: 'temp', cat: 'sensing', kind: 'num', parts: [T('température °C, capteur', 'درجة الحرارة °م، الحسّاس'), SEL('pin', ANALOG, 'A1')] },
   { type: 'millis', cat: 'sensing', kind: 'num', parts: [T('temps écoulé (ms)', 'الوقت المنقضي (م.ث)')] },
 
   // ------------------------------------------------------------- variables
@@ -199,23 +209,4 @@ export function sanitizeWorkspace(raw: unknown): Workspace | null {
 
 export function emptyWorkspace(): Workspace {
   return { setup: [], loop: [] };
-}
-
-/** Exemple de départ pour la leçon « Blink ». */
-export function starterFor(lessonId: string): Workspace {
-  if (lessonId !== 'blink') return emptyWorkspace();
-  const mk = (type: string, vals: Record<string, string>): Block => {
-    const b = newBlock(type);
-    Object.assign(b.vals, vals);
-    return b;
-  };
-  return {
-    setup: [mk('pin_mode', { pin: '13', mode: 'OUTPUT' })],
-    loop: [
-      mk('write', { pin: '13', level: 'HIGH' }),
-      mk('wait', { ms: '1000' }),
-      mk('write', { pin: '13', level: 'LOW' }),
-      mk('wait', { ms: '1000' }),
-    ],
-  };
 }
