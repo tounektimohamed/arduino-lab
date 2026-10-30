@@ -1,6 +1,6 @@
 import type { Localized } from '../i18n';
 
-export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd' | 'distance' | 'thermo' | 'dc-motor-shield';
+export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd' | 'distance' | 'thermo' | 'motor1' | 'motor2';
 export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd' | 'ultrasonic' | 'tmp36' | 'motor';
 
 export interface ComponentPhoto {
@@ -802,37 +802,139 @@ void loop() {
     highlightPins: ['A1', 'A4', 'A5', '5V', 'GND-F', '8', '9', 'GND'],
   },
   {
-    id: 'dc-motor-shield',
-    title: { fr: 'Moteur DC via shield', ar: 'محرّك تيار مستمر عبر درع' },
+    id: 'motor1',
+    title: { fr: 'Un moteur avec le Motor Shield', ar: 'محرك واحد مع درع المحركات' },
     tagline: {
-      fr: 'Faire tourner un moteur DC et inverser son sens avec un shield et deux broches.',
-      ar: 'تدوير محرّك تيار مستمر وعكس اتجاهه باستخدام درع ومنفذين.',
+      fr: 'Avant, arrière et arrêt avec la bibliothèque AFMotor.',
+      ar: 'أمام وخلف وتوقف بمكتبة AFMotor.',
     },
-    duration: 16,
+    duration: 15,
     level: { fr: 'Intermédiaire', ar: 'متوسط' },
     description: {
-      fr: 'Le shield pilote le moteur à partir de deux broches Arduino : la broche 9 régule la vitesse par PWM (analogWrite) et la broche 8 choisit le sens de rotation (digitalWrite). Réglez le curseur pour faire varier la vitesse.',
-      ar: 'يدير الدرع المحرّك من خلال منفذي أردوينو: المنفذ 9 يضبط السرعة باستخدام PWM (analogWrite) والمنفذ 8 يختار اتجاه الدوران (digitalWrite). ضبّط المنزلق لتعديل السرعة.',
+      fr: 'Un moteur consomme trop de courant pour une broche de l’Uno : on utilise donc un Motor Shield. Il se clipe sur la carte et reçoit sa propre alimentation (EXT_PWR). Avec AF_DCMotor moteur(1) on pilote la borne M1 : setSpeed() règle la vitesse (0 à 255) et run() choisit FORWARD, BACKWARD ou RELEASE (arrêt).',
+      ar: 'يستهلك المحرك تيارًا أكبر من أن يوفّره منفذ في Uno، لذلك نستخدم درع المحركات. يُركَّب فوق اللوحة ويأخذ تغذيته الخاصة (EXT_PWR). مع AF_DCMotor moteur(1) نتحكم بالطرف M1: تضبط setSpeed() السرعة (من 0 إلى 255) وتختار run() الاتجاه FORWARD أو BACKWARD أو RELEASE (توقف).',
     },
     objectives: {
-      fr: ['Contrôler la vitesse avec analogWrite().', 'Changer le sens de rotation avec digitalWrite().', 'Lire la valeur sur le moniteur série.'],
-      ar: ['التحكم في السرعة عبر analogWrite().', 'تغيير اتجاه الدوران عبر digitalWrite().', 'اقرأ القيمة على مراقب المنفذ التسلسلي.'],
+      fr: ['Comprendre le rôle du shield et de l’alimentation externe.', 'Déclarer un moteur avec AF_DCMotor.', 'Piloter le sens et la vitesse avec run() et setSpeed().'],
+      ar: ['فهم دور الدرع والتغذية الخارجية.', 'التصريح بمحرك باستخدام AF_DCMotor.', 'التحكم في الاتجاه والسرعة بـ run() وsetSpeed().'],
     },
     wiring: {
-      fr: ['Shield moteur : VCC → 5V, GND → GND.', 'ENA (vitesse) → broche 9 (PWM).', 'IN1 (sens) → broche 8.', 'Moteur sur les bornes M du shield.'],
-      ar: ['درع المحرّك: VCC ← 5V، وGND ← GND.', 'ENA (السرعة) ← المنفذ 9 (PWM).', 'IN1 (الاتجاه) ← المنفذ 8.', 'المحرّك على منافذ M بالدرع.'],
+      fr: ['Poser le shield sur l’Uno.', 'Moteur : une patte → M1 (vis gauche), l’autre → M1 (vis droite).', 'Pack de piles : + → EXT_PWR (+), − → EXT_PWR (−).'],
+      ar: ['ضع الدرع فوق Uno.', 'المحرك: ساق ← M1 (البرغي الأيسر) والأخرى ← M1 (البرغي الأيمن).', 'علبة البطاريات: + ← EXT_PWR (+) و − ← EXT_PWR (−).'],
     },
     challenge: {
-      fr: 'Faites tourner le moteur à vitesse max pendant 3 secondes, puis arrêtez-le 2 secondes.',
-      ar: 'اجعل المحرّك يدور بأقصى سرعة لمدة 3 ثوانٍ، ثم توقّفه ثانيتين.',
+      fr: 'Faites accélérer le moteur progressivement de 0 à 255 avec une boucle for.',
+      ar: 'اجعل المحرك يتسارع تدريجيًا من 0 إلى 255 بحلقة for.',
     },
     hint: {
-      fr: 'Lancez le code : le moteur accélère, ralentit et change de sens.',
-      ar: 'شغّل الكود: يسرّع المحرّك ثمّ يبطئ ويغيّر اتجاهه.',
+      fr: 'Lancez le code : la roue tourne dans un sens, s’arrête, puis repart dans l’autre.',
+      ar: 'شغّل الكود: تدور العجلة في اتجاه ثم تتوقف ثم تعود في الاتجاه الآخر.',
     },
-    code: `// Leçon 19 — moteur DC via shield\nconst int PWM = 9;\nconst int DIR = 8;\n\nint vitesse = 0;\nint sens = 1;\n\nvoid setup() {\n  pinMode(PWM, OUTPUT);\n  pinMode(DIR, OUTPUT);\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  if (sens == 1) {\n    digitalWrite(DIR, HIGH);\n  } else {\n    digitalWrite(DIR, LOW);\n  }\n  analogWrite(PWM, vitesse);\n  Serial.print("Vitesse : ");\n  Serial.println(vitesse);\n  vitesse += sens * 5;\n  if (vitesse >= 255) { sens = -1; vitesse = 255; }\n  if (vitesse <= 0) { sens = 1; vitesse = 0; }\n  delay(30);\n}\n`,
+    code: `// Leçon 19 — un moteur avec le Motor Shield
+
+const int PWM = 9;
+const int DIR = 8;
+
+int vitesse = 0;
+int sens = 1;
+
+void setup() {
+  pinMode(PWM, OUTPUT);
+  pinMode(DIR, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  if (sens == 1) {
+    digitalWrite(DIR, HIGH);
+  } else {
+    digitalWrite(DIR, LOW);
+  }
+  analogWrite(PWM, vitesse);
+  Serial.print("Vitesse : ");
+  Serial.println(vitesse);
+  vitesse += sens * 5;
+  if (vitesse >= 255) { sens = -1; vitesse = 255; }
+  if (vitesse <= 0) { sens = 1; vitesse = 0; }
+  delay(30);
+}
+`,
     components: ['motor', 'wires'],
     highlightPins: ['9', '8', '5V', 'GND'],
+  },
+  {
+    id: 'motor2',
+    title: { fr: 'Deux moteurs : un robot', ar: 'محركان: روبوت' },
+    tagline: { fr: 'Avancer, tourner et s’arrêter avec deux moteurs M1 et M2.', ar: 'التقدّم والدوران والتوقف بمحركين M1 وM2.' },
+    duration: 18,
+    level: { fr: 'Avancé', ar: 'متقدم' },
+    description: {
+      fr: 'Deux moteurs, un par roue, forment la base d’un robot. Les deux en avant : le robot avance. L’un en avant et l’autre en arrière : il tourne sur place. On range ces gestes dans des fonctions (avancer, tourner, stopper) pour que loop() reste lisible.',
+      ar: 'محركان، واحد لكل عجلة، هما أساس الروبوت. إذا دار الاثنان إلى الأمام يتقدّم الروبوت، وإذا دار أحدهما للأمام والآخر للخلف يدور في مكانه. نضع هذه الحركات في دوال (avancer وtourner وstopper) ليبقى loop() واضحًا.',
+    },
+    objectives: {
+      fr: ['Piloter deux moteurs M1 et M2 en même temps.', 'Combiner les sens pour avancer ou tourner.', 'Organiser le code avec des fonctions.'],
+      ar: ['التحكم بالمحركين M1 وM2 في الوقت نفسه.', 'الجمع بين الاتجاهات للتقدّم أو الدوران.', 'تنظيم الكود بالدوال.'],
+    },
+    wiring: {
+      fr: ['Moteur gauche → borne M1, moteur droit → borne M2.', 'Pack de piles → EXT_PWR (+ et −).'],
+      ar: ['المحرك الأيسر ← الطرف M1 والأيمن ← الطرف M2.', 'علبة البطاريات ← EXT_PWR ‏(+ و −).'],
+    },
+    challenge: {
+      fr: 'Ajoutez une fonction reculer(vitesse) et faites un carré : avancer, tourner, quatre fois.',
+      ar: 'أضف دالة reculer(vitesse) وارسم مربعًا: تقدّم ثم دوران أربع مرات.',
+    },
+    hint: {
+      fr: 'Regardez le sens des deux roues : identiques pour avancer, opposés pour tourner.',
+      ar: 'راقب اتجاه العجلتين: متماثل للتقدّم ومتعاكس للدوران.',
+    },
+    code: `// Leçon 20 — deux moteurs : un robot
+
+const int PWM1 = 9;
+const int PWM2 = 10;
+const int DIR1 = 8;
+const int DIR2 = 11;
+
+void avancer(int vitesse) {
+  digitalWrite(DIR1, HIGH);
+  digitalWrite(DIR2, HIGH);
+  analogWrite(PWM1, vitesse);
+  analogWrite(PWM2, vitesse);
+}
+
+void tourner(int vitesse) {
+  digitalWrite(DIR1, HIGH);
+  digitalWrite(DIR2, LOW);
+  analogWrite(PWM1, vitesse);
+  analogWrite(PWM2, vitesse);
+}
+
+void stopper() {
+  analogWrite(PWM1, 0);
+  analogWrite(PWM2, 0);
+}
+
+void setup() {
+  pinMode(PWM1, OUTPUT);
+  pinMode(PWM2, OUTPUT);
+  pinMode(DIR1, OUTPUT);
+  pinMode(DIR2, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  Serial.println("Avance");
+  avancer(200);
+  delay(2000);
+  Serial.println("Tourne");
+  tourner(180);
+  delay(800);
+  stopper();
+  delay(1000);
+}
+`,
+    components: ['motor', 'wires'],
+    highlightPins: ['9', '8', '10', '11', '5V', 'GND'],
   },
 ];
 
