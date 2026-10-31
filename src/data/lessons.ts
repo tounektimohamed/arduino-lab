@@ -1,6 +1,6 @@
 import type { Localized } from '../i18n';
 
-export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd' | 'distance' | 'thermo' | 'motor1' | 'motor2' | 'car';
+export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd' | 'distance' | 'thermo' | 'motor1' | 'motor2' | 'car' | 'radar';
 export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd' | 'ultrasonic' | 'tmp36' | 'motor' | 'shield' | 'dcmotor' | 'dcmotor2' | 'battery' | 'car';
 
 export interface ComponentPhoto {
@@ -938,6 +938,143 @@ void loop() {
     },
     code: `// Leçon 21 — voiture anti-obstacles\n#include <AFMotor.h>\n\nAF_DCMotor gauche(1);\nAF_DCMotor droite(2);\n\nconst int TRIG = A2;\nconst int ECHO = A3;\n\nvoid rouler(int sensGauche, int sensDroite, int vitesse) {\n  gauche.setSpeed(vitesse);\n  droite.setSpeed(vitesse);\n  gauche.run(sensGauche);\n  droite.run(sensDroite);\n}\n\nvoid avancer(int v) {\n  rouler(FORWARD, FORWARD, v);\n}\n\nvoid reculer(int v) {\n  rouler(BACKWARD, BACKWARD, v);\n}\n\nvoid tournerGauche(int v) {\n  rouler(BACKWARD, FORWARD, v);\n}\n\nvoid tournerDroite(int v) {\n  rouler(FORWARD, BACKWARD, v);\n}\n\nvoid stopper() {\n  gauche.run(RELEASE);\n  droite.run(RELEASE);\n}\n\nint mesurer() {\n  digitalWrite(TRIG, LOW);\n  delayMicroseconds(2);\n  digitalWrite(TRIG, HIGH);\n  delayMicroseconds(10);\n  digitalWrite(TRIG, LOW);\n  return round(pulseIn(ECHO, HIGH) / 58.0);\n}\n\nvoid setup() {\n  pinMode(TRIG, OUTPUT);\n  pinMode(ECHO, INPUT);\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  int distance = mesurer();\n  Serial.println(distance);\n\n  if (distance > 0 && distance < 25) {\n    stopper();\n    delay(200);\n    reculer(150);\n    delay(400);\n    if (random(0, 2) == 0) {\n      tournerGauche(180);\n    } else {\n      tournerDroite(180);\n    }\n    delay(500);\n  } else {\n    avancer(170);\n  }\n\n  delay(50);\n}\n`,
     components: ['car', 'shield', 'dcmotor', 'dcmotor2', 'battery', 'ultrasonic', 'wires'],
+    highlightPins: [],
+  },
+  {
+    id: 'radar',
+    title: { fr: 'Voiture radar (capteur sur servo)', ar: 'سيارة رادار (الحسّاس فوق محرّك servo)' },
+    tagline: {
+      fr: 'Le HC-SR04 est collé sur un servo : la voiture arrêtée regarde à gauche et à droite, puis choisit le côté le plus dégagé.',
+      ar: 'حسّاس HC-SR04 مثبّت فوق محرّك servo: تتوقف السيارة وتنظر يسارًا ويمينًا ثم تختار الجهة الأكثر فراغًا.',
+    },
+    duration: 30,
+    level: { fr: 'Projet', ar: 'مشروع' },
+    description: {
+      fr: 'Un capteur fixe ne voit que devant lui. En le montant sur un servomoteur (broche 10 du Motor Shield, connecteur SER1), la voiture peut « balayer » son environnement comme un radar. Quand un obstacle est à moins de 30 cm, elle s’arrête, recule un peu, tourne la tête à 160° (gauche) puis à 20° (droite), mesure la distance dans chaque direction et tourne du côté où il y a le plus de place, jusqu’à ce que la voie devant soit libre. L’arène est grande : regardez-la explorer toute la pièce.',
+      ar: 'الحسّاس الثابت لا يرى إلا ما أمامه. عند تركيبه فوق محرّك مؤازر (المنفذ 10 في درع المحرّكات، الموصل SER1) تستطيع السيارة أن «تمسح» محيطها مثل الرادار. عندما يصبح العائق على بعد أقل من 30 سم تتوقف وتدير رأسها إلى 160° (يسارًا) ثم إلى 20° (يمينًا) وتقيس المسافة في كل اتجاه ثم تدور نحو الجهة الأكثر فراغًا، وتستمر في الدوران حتى يصبح الطريق أمامها خاليًا. الساحة كبيرة: تابعها وهي تستكشف الغرفة كلها.',
+    },
+    objectives: {
+      fr: ['Monter un capteur sur un servomoteur et le commander avec Servo.write().', 'Écrire une fonction regarder(angle) qui tourne la tête puis mesure.', 'Comparer deux mesures pour choisir une direction.'],
+      ar: ['تركيب حسّاس فوق محرّك مؤازر والتحكم به بـ Servo.write().', 'كتابة دالة regarder(angle) تدير الرأس ثم تقيس.', 'مقارنة قياسين لاختيار الاتجاه.'],
+    },
+    wiring: {
+      fr: ['Tout est monté sur le châssis ; le HC-SR04 est fixé sur le palonnier du servo, à l’avant.', 'Servo : orange (signal) → SER1 (broche 10), rouge → 5V, marron → GND.', 'Moteur gauche → M1, moteur droit → M2 ; pack de piles → EXT_PWR.', 'HC-SR04 : VCC → 5V, TRIG → A2, ECHO → A3, GND → GND.'],
+      ar: ['كل القطع مركّبة على الهيكل؛ وحسّاس HC-SR04 مثبّت على ذراع المحرّك المؤازر في المقدمة.', 'المحرّك المؤازر: البرتقالي (الإشارة) ← SER1 ‏(المنفذ 10)، والأحمر ← 5V، والبني ← GND.', 'المحرّك الأيسر ← M1 والأيمن ← M2؛ وعلبة البطاريات ← EXT_PWR.', 'HC-SR04: ‏VCC ← 5V، وTRIG ← A2، وECHO ← A3، وGND ← GND.'],
+    },
+    challenge: {
+      fr: 'Ajoutez un troisième regard à 90° (tout droit) et affichez les trois distances avec Serial.println().',
+      ar: 'أضف نظرة ثالثة عند 90° (إلى الأمام) واعرض المسافات الثلاث بـ Serial.println().',
+    },
+    hint: {
+      fr: 'Observez la tête de la voiture : l’angle du servo s’affiche à côté des vitesses des moteurs. Changez 160 et 20 pour regarder plus ou moins de côté.',
+      ar: 'راقب رأس السيارة: تظهر زاوية المحرّك المؤازر بجانب سرعتَي المحرّكين. غيّر 160 و20 لتنظر بزاوية أكبر أو أصغر.',
+    },
+    code: `// Leçon 22 — voiture radar : le HC-SR04 est monté sur un servo
+#include <AFMotor.h>
+#include <Servo.h>
+
+AF_DCMotor gauche(1);
+AF_DCMotor droite(2);
+Servo tete;            // le servo qui fait tourner le capteur (broche 10)
+
+const int TRIG = A2;
+const int ECHO = A3;
+
+void rouler(int sensGauche, int sensDroite, int vitesse) {
+  gauche.setSpeed(vitesse);
+  droite.setSpeed(vitesse);
+  gauche.run(sensGauche);
+  droite.run(sensDroite);
+}
+
+void avancer(int v) {
+  rouler(FORWARD, FORWARD, v);
+}
+
+void reculer(int v) {
+  rouler(BACKWARD, BACKWARD, v);
+}
+
+void tournerGauche(int v) {
+  rouler(BACKWARD, FORWARD, v);
+}
+
+void tournerDroite(int v) {
+  rouler(FORWARD, BACKWARD, v);
+}
+
+void stopper() {
+  gauche.run(RELEASE);
+  droite.run(RELEASE);
+}
+
+int mesurer() {
+  digitalWrite(TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG, LOW);
+  return round(pulseIn(ECHO, HIGH) / 58.0);
+}
+
+// Tourne la tête vers un angle (90 = tout droit), attend, puis mesure.
+int regarder(int angle) {
+  tete.write(angle);
+  delay(350);
+  return mesurer();
+}
+
+void setup() {
+  pinMode(TRIG, OUTPUT);
+  pinMode(ECHO, INPUT);
+  tete.attach(10);
+  tete.write(90);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int devant = mesurer();
+  Serial.println(devant);
+
+  if (devant > 0 && devant < 30) {
+    stopper();
+    delay(200);
+    reculer(150);          // on se donne un peu de place pour tourner
+    delay(300);
+    stopper();
+
+    // Balayage : on regarde à gauche (160°) puis à droite (20°)
+    int cmGauche = regarder(160);
+    int cmDroite = regarder(20);
+    tete.write(90);
+    delay(300);
+
+    Serial.print("gauche = ");
+    Serial.print(cmGauche);
+    Serial.print(" cm, droite = ");
+    Serial.println(cmDroite);
+
+    // On tourne du côté où il y a le plus de place...
+    if (cmGauche > cmDroite) {
+      tournerGauche(180);
+    } else {
+      tournerDroite(180);
+    }
+
+    // ... jusqu'à ce que la voie devant soit libre (plus de 40 cm)
+    int essais = 0;
+    while (mesurer() < 40 && essais < 100) {
+      delay(50);
+      essais++;
+    }
+  } else {
+    avancer(170);
+  }
+
+  delay(50);
+}
+`,
+    components: ['car', 'shield', 'dcmotor', 'dcmotor2', 'battery', 'ultrasonic', 'servo', 'wires'],
     highlightPins: [],
   },
 ];

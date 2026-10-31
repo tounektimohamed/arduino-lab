@@ -26,6 +26,9 @@ import {
   wireMesh,
 } from './builders';
 
+/** Hauteur (cm) du palonnier du servo sur la voiture. */
+const SERVO_HEAD_Y = 4.95 + 3.15;
+
 const COLORS = {
   pcb: 0x0b6f7d,
   gold: 0xd8a63a,
@@ -126,6 +129,18 @@ export class ArduinoScene {
   private carPingRing!: THREE.Mesh;
   private readonly carRig = new THREE.Group();
   private readonly carSpin: THREE.Group[] = [];
+  private readonly carHead = new THREE.Group(); // pivot du servo : tourne avec le capteur
+  private readonly carServo = new THREE.Group();
+  private readonly carServoWires = new THREE.Group();
+  private readonly carSensorWires = new THREE.Group();
+  private readonly carPingPivot = new THREE.Group();
+  private carSensor?: THREE.Group;
+  private carSensorPins: THREE.Vector3[] = [];
+  private carPinPoints: THREE.Vector3[] = [];
+  private carPinHeights = [2.4, 3.0, 3.5, 2.0];
+  private carPinColors = [COLORS.red, COLORS.green, COLORS.orange, COLORS.black];
+  private carRadar = false;
+  private carHeadAngle = Number.NaN;
   private labObjects: THREE.Object3D[] = [];
   private distanceCm = 30;
   private pingUntil = 0;
@@ -268,6 +283,7 @@ export class ArduinoScene {
     this.carGroup.visible = car;
     this.arenaGroup.visible = car;
     for (const object of this.labObjects) object.visible = !car;
+    this.mountSensor(car && has('servo'));
     if (car) {
       // La voiture embarque sa propre carte, son shield, sa batterie, ses moteurs et son capteur.
       this.shieldGroup.visible = false;
@@ -1580,8 +1596,58 @@ export class ArduinoScene {
       sensor.add(pin);
     }
     this.registerPart(sensor, 'ultrasonic');
+    this.carSensor = sensor;
+    this.carSensorPins = sensorPins.map((x) => vec(x, -0.8, 1.0)); // broches, repère du capteur
+    this.carPinPoints = [p5V, pA2, pA3, pGND];
     rig.add(sensor);
-    const sp = (i: number): THREE.Vector3 => vec(sensorPins[i], 6.6 - 0.8, -10.0 + 1.0);
+
+    // ---- servo (leçon 22) : le capteur se pose sur son palonnier et tourne avec lui
+    const SERVO_Y = 4.95;
+    this.carServo.position.set(0, SERVO_Y, -9.2);
+    const servoBlue = std(0x3b6fb6, { roughness: 0.5 });
+    const servoBody = new THREE.Mesh(new THREE.BoxGeometry(2.25, 2.27, 1.2), servoBlue);
+    servoBody.position.set(-0.55, 1.135, 0);
+    servoBody.castShadow = true;
+    this.carServo.add(servoBody);
+    const servoEars = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.25, 1.2), servoBlue);
+    servoEars.position.set(-0.55, 1.55, 0);
+    this.carServo.add(servoEars);
+    const servoBump = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.35, 18), servoBlue);
+    servoBump.position.set(0, 2.4, 0);
+    this.carServo.add(servoBump);
+    const servoShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.6, 12), silver);
+    servoShaft.position.set(0, 2.8, 0);
+    this.carServo.add(servoShaft);
+    const servoText = textPlane('SG90', 1.6);
+    servoText.rotation.x = -Math.PI / 2;
+    servoText.position.set(-0.55, 2.275, 0.05);
+    this.carServo.add(servoText);
+    this.registerPart(this.carServo, 'servo');
+    this.carServo.visible = false;
+    rig.add(this.carServo);
+
+    this.carHead.position.set(0, SERVO_Y + 3.15, -9.2); // dessus du palonnier
+    const horn = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.2, 0.6), std(0xf2f0ea, { roughness: 0.6 }));
+    horn.position.y = -0.1;
+    this.carHead.add(horn);
+    this.carHead.visible = false;
+    rig.add(this.carHead);
+
+    // fils du servo → connecteur SER1 (broche 10) du shield : orange (signal), rouge (5V), marron (GND)
+    const serWires: [number, number, number][] = [
+      [-2.3, 0x8a5a2b, 0],
+      [-2.0, COLORS.red, 1],
+      [-1.7, COLORS.orange, 2],
+    ];
+    const cable = [-0.8, -0.55, -0.3];
+    serWires.forEach(([hx, color, i]) => {
+      const header = toRig(hx, 0.54 + 0.3, -1.35);
+      const exit = vec(cable[2 - i], SERVO_Y + 1.0, -9.2 + 0.75);
+      this.carServoWires.add(wireMesh(archPoints(exit, header, 2.0 + i * 0.5), color, WIRE * 0.7));
+    });
+    this.carServoWires.visible = false;
+    rig.add(this.carServoWires);
+    rig.add(this.carSensorWires);
 
     // ---- fils
     const wires = new THREE.Group();
@@ -1596,11 +1662,6 @@ export class ArduinoScene {
     // pack de piles → EXT_PWR
     wire(archPoints(batteryOut[1], ext[1], 1.4), COLORS.red);
     wire(archPoints(batteryOut[0], ext[0], 1.0), COLORS.black);
-    // capteur → 5V, A2 (TRIG), A3 (ECHO), GND
-    wire(archPoints(sp(0), p5V, 2.4), COLORS.red);
-    wire(archPoints(sp(1), pA2, 3.0), COLORS.green);
-    wire(archPoints(sp(2), pA3, 3.5), COLORS.orange);
-    wire(archPoints(sp(3), pGND, 2.0), COLORS.black);
     rig.add(wires);
 
     // ---- onde ultrasonore devant le capteur
@@ -1608,12 +1669,68 @@ export class ArduinoScene {
       new THREE.TorusGeometry(1.6, 0.1, 8, 32),
       new THREE.MeshBasicMaterial({ color: 0x6ad0ff, transparent: true, opacity: 0, depthWrite: false }),
     );
-    this.carPingRing.position.set(0, 6.6, -11.4);
-    rig.add(this.carPingRing);
+    this.carPingRing.position.set(0, 0, -1.4);
+    this.carPingPivot.add(this.carPingRing);
+    rig.add(this.carPingPivot);
 
     this.carGroup.visible = false;
     this.scene.add(this.carGroup);
+    this.mountSensor(false);
     this.updateCarVisual(0);
+  }
+
+  /** Capteur fixe à l'avant (leçon 21) ou posé sur le servo (leçon 22). */
+  private mountSensor(radar: boolean): void {
+    const sensor = this.carSensor;
+    if (!sensor) return;
+    this.carRadar = radar;
+    this.carServo.visible = radar;
+    this.carHead.visible = radar;
+    this.carServoWires.visible = radar;
+    if (radar) {
+      this.carHead.add(sensor);
+      sensor.position.set(0, 1.7, 0);
+    } else {
+      this.carRig.add(sensor);
+      sensor.position.set(0, 6.6, -10.0);
+      this.carHead.rotation.y = 0;
+    }
+    this.carHeadAngle = Number.NaN; // force la mise à jour des fils
+    this.updateCarHead();
+  }
+
+  /** Oriente la tête selon l'angle du servo et reconnecte les fils du capteur. */
+  private updateCarHead(): void {
+    const sensor = this.carSensor;
+    if (!sensor) return;
+    const angle = this.carRadar ? this.board.car.servoAngle : 90;
+    if (Math.abs(angle - this.carHeadAngle) < 0.3) return;
+    this.carHeadAngle = angle;
+    this.carHead.rotation.y = ((angle - 90) * Math.PI) / 180;
+    this.carHead.updateMatrix();
+    sensor.updateMatrix();
+    for (const child of [...this.carSensorWires.children]) {
+      this.carSensorWires.remove(child);
+      child.traverse((o) => {
+        if (o instanceof THREE.Mesh) {
+          o.geometry.dispose();
+          (o.material as THREE.Material).dispose();
+        }
+      });
+    }
+    this.carSensorPins.forEach((local, i) => {
+      const p = local.clone().applyMatrix4(sensor.matrix);
+      if (this.carRadar) p.applyMatrix4(this.carHead.matrix);
+      this.carSensorWires.add(wireMesh(archPoints(p, this.carPinPoints[i], this.carPinHeights[i]), this.carPinColors[i], 0.14));
+    });
+    // l'onde part du capteur, dans sa direction
+    if (this.carRadar) {
+      this.carPingPivot.position.set(0, SERVO_HEAD_Y + 1.7, -9.2);
+      this.carPingPivot.rotation.y = this.carHead.rotation.y;
+    } else {
+      this.carPingPivot.position.set(0, 6.6, -10.0);
+      this.carPingPivot.rotation.y = 0;
+    }
   }
 
   private updateCarVisual(delta: number): void {
@@ -2267,10 +2384,11 @@ export class ArduinoScene {
     if (this.carGroup.visible) {
       this.board.stepCar(delta);
       this.updateCarVisual(delta);
+      this.updateCarHead();
       const material = this.carPingRing.material as THREE.MeshBasicMaterial;
       if (time < this.pingUntil) {
         const phase = (time * 3) % 1;
-        this.carPingRing.position.z = -11.4 - phase * 22;
+        this.carPingRing.position.z = -1.4 - phase * 22;
         this.carPingRing.scale.setScalar(1 + phase * 2.2);
         material.opacity = (1 - phase) * 0.7;
       } else {

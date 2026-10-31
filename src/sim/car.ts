@@ -41,8 +41,18 @@ export class CarModel {
   /** Vitesses normalisées des roues (-1 … 1), pour animer les roues. */
   left = 0;
   right = 0;
+  /** Angle courant du servo qui porte le capteur (90° = tout droit, 0° = à droite, 180° = à gauche). */
+  servoAngle = 90;
+
+  /** Le servo tourne à environ 400°/s : il rejoint l'angle demandé sans sauter. */
+  moveHead(dt: number, target: number): void {
+    const maxStep = 400 * dt;
+    const diff = target - this.servoAngle;
+    this.servoAngle += Math.abs(diff) <= maxStep ? diff : Math.sign(diff) * maxStep;
+  }
 
   reset(): void {
+    this.servoAngle = 90;
     this.x = START.x;
     this.z = START.z;
     this.heading = START.heading;
@@ -97,8 +107,10 @@ export class CarModel {
     const f = this.forward();
     const ox = this.x + f.x * SENSOR_OFFSET;
     const oz = this.z + f.z * SENSOR_OFFSET;
-    for (const angle of BEAM) best = Math.min(best, this.rayDistance(ox, oz, this.heading + angle));
-    for (const side of CORRIDOR) {
+    const look = this.heading + ((90 - this.servoAngle) * Math.PI) / 180; // direction du capteur
+    for (const angle of BEAM) best = Math.min(best, this.rayDistance(ox, oz, look + angle));
+    // Le « couloir » (largeur de la voiture) ne sert que lorsque le capteur regarde droit devant.
+    for (const side of Math.abs(this.servoAngle - 90) < 8 ? CORRIDOR : []) {
       // décalage latéral (perpendiculaire à l'avant) : (cos h, sin h)
       best = Math.min(
         best,
