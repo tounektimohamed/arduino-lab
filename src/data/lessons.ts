@@ -950,8 +950,8 @@ void loop() {
     duration: 30,
     level: { fr: 'Projet', ar: 'مشروع' },
     description: {
-      fr: 'Un capteur fixe ne voit que devant lui. En le montant sur un servomoteur (broche 10 du Motor Shield, connecteur SER1), la voiture peut « balayer » son environnement comme un radar. Quand un obstacle est à moins de 30 cm, elle s’arrête, recule un peu, tourne la tête à 160° (gauche) puis à 20° (droite), mesure la distance dans chaque direction et tourne du côté où il y a le plus de place, jusqu’à ce que la voie devant soit libre. L’arène est grande : regardez-la explorer toute la pièce.',
-      ar: 'الحسّاس الثابت لا يرى إلا ما أمامه. عند تركيبه فوق محرّك مؤازر (المنفذ 10 في درع المحرّكات، الموصل SER1) تستطيع السيارة أن «تمسح» محيطها مثل الرادار. عندما يصبح العائق على بعد أقل من 30 سم تتوقف وتدير رأسها إلى 160° (يسارًا) ثم إلى 20° (يمينًا) وتقيس المسافة في كل اتجاه ثم تدور نحو الجهة الأكثر فراغًا، وتستمر في الدوران حتى يصبح الطريق أمامها خاليًا. الساحة كبيرة: تابعها وهي تستكشف الغرفة كلها.',
+      fr: 'Un capteur fixe ne voit que devant lui. En le montant sur un servomoteur (broche 10 du Motor Shield, connecteur SER1), la voiture peut « balayer » son environnement comme un radar. Quand un obstacle est à moins de 30 cm, elle s’arrête, recule un peu, tourne la tête à 160° (gauche) puis à 20° (droite), mesure la distance dans chaque direction et tourne du côté où il y a le plus de place, jusqu’à ce que la voie devant soit libre.',
+      ar: 'الحسّاس الثابت لا يرى إلا ما أمامه. عند تركيبه فوق محرّك مؤازر (المنفذ 10 في درع المحرّكات، الموصل SER1) تستطيع السيارة أن «تمسح» محيطها مثل الرادار. عندما يصبح العائق على بعد أقل من 30 سم تتوقف وتدير رأسها إلى 160° (يسارًا) ثم إلى 20° (يمينًا) وتقيس المسافة في كل اتجاه ثم تدور نحو الجهة الأكثر فراغًا، وتستمر في الدوران حتى يصبح الطريق أمامها خاليًا.',
     },
     objectives: {
       fr: ['Monter un capteur sur un servomoteur et le commander avec Servo.write().', 'Écrire une fonction regarder(angle) qui tourne la tête puis mesure.', 'Comparer deux mesures pour choisir une direction.'],
