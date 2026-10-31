@@ -11,22 +11,15 @@ export interface Box {
   color: number;
 }
 
-/** Grande salle d'essai : 48 × 41 unités (≈ 1,9 m × 1,6 m), 8 fois plus de surface qu'avant. */
 export const ARENA = {
-  minX: -24,
-  maxX: 24,
-  minZ: -20,
+  minX: -11,
+  maxX: 11,
+  minZ: 5,
   maxZ: 21,
   obstacles: [
-    { x: -14, z: 8, w: 5, d: 2.2, color: 0xd94f3d },
-    { x: 14, z: 10, w: 2.5, d: 5, color: 0x3f7bd9 },
-    { x: 0, z: -4, w: 3.5, d: 3.5, color: 0x2f9e6f },
-    { x: -18, z: -10, w: 2.5, d: 5.5, color: 0x8e5bd9 },
-    { x: 16, z: -8, w: 4.5, d: 2.4, color: 0xe0a82e },
-    { x: -6, z: -14, w: 5.5, d: 2.2, color: 0xd94f3d },
-    { x: 8, z: -16, w: 3.2, d: 3.2, color: 0x3f7bd9 },
-    { x: -17, z: 16, w: 2.4, d: 2.4, color: 0xe0a82e },
-    { x: 17, z: 17, w: 3, d: 2.4, color: 0x8e5bd9 },
+    { x: -5.5, z: 11.5, w: 4, d: 2, color: 0xd94f3d },
+    { x: 5.5, z: 14, w: 2.5, d: 4.5, color: 0x3f7bd9 },
+    { x: -1, z: 8.2, w: 2.2, d: 2.2, color: 0x2f9e6f },
   ] as Box[],
 };
 
@@ -36,7 +29,7 @@ export const TOP_SPEED = 8;
 const TRACK = 4.5; // écart entre les roues
 export const CAR_RADIUS = 2.7;
 export const SENSOR_OFFSET = 2.6;
-const START = { x: 0, z: 12, heading: 0 };
+const START = { x: 0, z: 17.8, heading: 0 };
 
 export class CarModel {
   x = START.x;
@@ -48,18 +41,8 @@ export class CarModel {
   /** Vitesses normalisées des roues (-1 … 1), pour animer les roues. */
   left = 0;
   right = 0;
-  /** Angle courant du servo qui porte le capteur (90° = tout droit, 0° = à droite, 180° = à gauche). */
-  servoAngle = 90;
-
-  /** Le servo tourne à environ 400°/s : il rejoint l'angle demandé sans sauter. */
-  moveHead(dt: number, target: number): void {
-    const maxStep = 400 * dt;
-    const diff = target - this.servoAngle;
-    this.servoAngle += Math.abs(diff) <= maxStep ? diff : Math.sign(diff) * maxStep;
-  }
 
   reset(): void {
-    this.servoAngle = 90;
     this.x = START.x;
     this.z = START.z;
     this.heading = START.heading;
@@ -114,10 +97,8 @@ export class CarModel {
     const f = this.forward();
     const ox = this.x + f.x * SENSOR_OFFSET;
     const oz = this.z + f.z * SENSOR_OFFSET;
-    const look = this.heading + ((90 - this.servoAngle) * Math.PI) / 180; // direction du capteur
-    for (const angle of BEAM) best = Math.min(best, this.rayDistance(ox, oz, look + angle));
-    // Le « couloir » (largeur de la voiture) ne sert que lorsque le capteur regarde droit devant.
-    for (const side of Math.abs(this.servoAngle - 90) < 8 ? CORRIDOR : []) {
+    for (const angle of BEAM) best = Math.min(best, this.rayDistance(ox, oz, this.heading + angle));
+    for (const side of CORRIDOR) {
       // décalage latéral (perpendiculaire à l'avant) : (cos h, sin h)
       best = Math.min(
         best,

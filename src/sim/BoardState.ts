@@ -319,7 +319,6 @@ export class BoardState {
   stepCar(dt: number): void {
     const [left, right] = this.motorSpeeds();
     this.car.step(dt, left, right);
-    this.car.moveHead(dt, this.servoAngle);
     this.carTouchedDistance = true;
     const cm = this.car.sensorCm();
     if (cm !== this.distanceCm) {

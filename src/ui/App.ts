@@ -912,10 +912,7 @@ export class App {
       const two = getLesson(this.activeId).components.some((id) => id === 'dcmotor2' || id === 'car');
       const base = two ? `M1 ${state(1)} · M2 ${state(2)}` : `M1 ${state(1)}`;
       const onCar = getLesson(this.activeId).components.includes('car');
-      const withServo = getLesson(this.activeId).components.includes('servo');
-      this.sensorValue.textContent = onCar
-        ? `${base} · ${board.distanceCm} cm${withServo ? ` · ${Math.round(board.car.servoAngle)}°` : ''}`
-        : base;
+      this.sensorValue.textContent = onCar ? `${base} · ${board.distanceCm} cm` : base;
     }
     else if (this.sensorKind === 'servo') this.sensorValue.textContent = `${board.servoAngle}°`;
     else if (this.sensorKind === 'buzzer') {

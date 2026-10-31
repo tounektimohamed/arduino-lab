@@ -325,43 +325,6 @@ export function starterFor(lessonId: string): Workspace {
       );
     }
 
-    case 'radar': {
-      const move = (dir: string, v: number): Block => mk('car_move', { dir, v: String(v) });
-      const look = (angle: number): Block[] => [mk('servo', { pin: '10', v: String(angle) }), wait(350)];
-      return ws(
-        [mk('servo', { pin: '10', v: '90' })],
-        [
-          mk('ultra', { name: 'valeur', trig: 'A2', echo: 'A3' }),
-          mk('sayval', {}, { v: V('valeur') }),
-          ifelse(
-            and(cmp(V('valeur'), '>', 0), cmp(V('valeur'), '<', 30)),
-            [
-              mk('car_stop'),
-              wait(200),
-              move('back', 150),
-              wait(300),
-              mk('car_stop'),
-              ...look(160),
-              mk('ultra', { name: 'dernier', trig: 'A2', echo: 'A3' }),
-              setv('score', V('dernier')),
-              ...look(20),
-              mk('ultra', { name: 'dernier', trig: 'A2', echo: 'A3' }),
-              mk('servo', { pin: '10', v: '90' }),
-              wait(300),
-              ifelse(cmp(V('score'), '>', V('dernier')), [move('left', 180)], [move('right', 180)]),
-              setv('compteur', 0),
-              mk('ultra', { name: 'valeur', trig: 'A2', echo: 'A3' }),
-              mk('while', {}, { cond: and(cmp(V('valeur'), '<', 40), cmp(V('compteur'), '<', 100)) }, {
-                body: [wait(50), mk('ultra', { name: 'valeur', trig: 'A2', echo: 'A3' }), addv('compteur', 1)],
-              }),
-            ],
-            [move('fwd', 170)],
-          ),
-          wait(50),
-        ],
-      );
-    }
-
     default:
       return emptyWorkspace();
   }
