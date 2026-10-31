@@ -701,13 +701,15 @@ export class App {
       servo: ['servoLabel', 'servoHint'],
       buzzer: ['toneLabel', 'toneHint'],
     } as const;
-    this.sensorKind = has('ldr')
+    this.sensorKind = has('car')
+      ? 'motor'
+      : has('ldr')
       ? 'light'
       : has('ultrasonic')
         ? 'distance'
         : has('tmp36')
           ? 'temp'
-          : has('dcmotor')
+          : has('dcmotor') || has('car')
             ? 'motor'
             : has('servo')
           ? 'servo'
@@ -907,8 +909,10 @@ export class App {
         const speed = board.motors[id - 1].speed;
         return velocity > 0 ? `▶ ${speed}` : velocity < 0 ? `◀ ${speed}` : '■';
       };
-      const two = getLesson(this.activeId).components.includes('dcmotor2');
-      this.sensorValue.textContent = two ? `M1 ${state(1)} · M2 ${state(2)}` : `M1 ${state(1)}`;
+      const two = getLesson(this.activeId).components.some((id) => id === 'dcmotor2' || id === 'car');
+      const base = two ? `M1 ${state(1)} · M2 ${state(2)}` : `M1 ${state(1)}`;
+      const onCar = getLesson(this.activeId).components.includes('car');
+      this.sensorValue.textContent = onCar ? `${base} · ${board.distanceCm} cm` : base;
     }
     else if (this.sensorKind === 'servo') this.sensorValue.textContent = `${board.servoAngle}°`;
     else if (this.sensorKind === 'buzzer') {

@@ -308,6 +308,23 @@ export function starterFor(lessonId: string): Workspace {
         ],
       );
 
+    case 'car': {
+      const move = (dir: string, v: number): Block => mk('car_move', { dir, v: String(v) });
+      return ws(
+        [],
+        [
+          mk('ultra', { name: 'valeur', trig: 'A2', echo: 'A3' }),
+          mk('sayval', {}, { v: V('valeur') }),
+          ifelse(
+            and(cmp(V('valeur'), '>', 0), cmp(V('valeur'), '<', 25)),
+            [mk('car_stop'), wait(200), move('back', 150), wait(400), mk('car_turn_random', { v: '180' }), wait(500)],
+            [move('fwd', 170)],
+          ),
+          wait(50),
+        ],
+      );
+    }
+
     default:
       return emptyWorkspace();
   }

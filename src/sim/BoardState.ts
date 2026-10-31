@@ -1,3 +1,5 @@
+import { CarModel } from './car';
+
 export type PinMode = 'INPUT' | 'OUTPUT' | 'INPUT_PULLUP';
 
 export interface SerialLine {
@@ -81,6 +83,11 @@ const clamp = (value: number, min: number, max: number): number =>
 
 export class BoardState {
   readonly serial = new SerialBuffer();
+  /** Voiture robot (leçon « voiture anti-obstacles »). */
+  readonly car = new CarModel();
+  /** Les moteurs ne tournent que pendant l'exécution du programme. */
+  programRunning = false;
+  private carTouchedDistance = false;
 
   buttonPressed = false;
   potValue = 512;
@@ -118,6 +125,11 @@ export class BoardState {
     this.buttonPressed = false;
     this.clearToneTimer();
     this.servoAngle = 90;
+    this.car.reset();
+    if (this.carTouchedDistance) {
+      this.carTouchedDistance = false;
+      this.distanceCm = 30;
+    }
     this.lcdColumns = 16;
     this.lcdRows = 2;
     this.lcdAddress = 39;
@@ -291,6 +303,28 @@ export class BoardState {
 
   private emitMotor(id: number): void {
     this.emit({ type: 'motor', id, velocity: this.motorVelocity(id) });
+  }
+
+  /** Vitesses des roues de la voiture (-1 … 1) : moteurs M1 (gauche) et M2 (droite) du Motor Shield. */
+  motorSpeeds(): [number, number] {
+    if (!this.programRunning) return [0, 0];
+    const wheel = (id: number): number => {
+      const velocity = this.motorVelocity(id);
+      return Math.abs(velocity) < 0.25 ? 0 : velocity;
+    };
+    return [wheel(1), wheel(2)];
+  }
+
+  /** Fait avancer la voiture de `dt` secondes et met à jour la mesure du capteur. */
+  stepCar(dt: number): void {
+    const [left, right] = this.motorSpeeds();
+    this.car.step(dt, left, right);
+    this.carTouchedDistance = true;
+    const cm = this.car.sensorCm();
+    if (cm !== this.distanceCm) {
+      this.distanceCm = cm;
+      this.emit({ type: 'distance', value: cm });
+    }
   }
 
   setDistance(cm: number): void {

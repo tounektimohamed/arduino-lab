@@ -1,7 +1,7 @@
 import type { Localized } from '../i18n';
 
-export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd' | 'distance' | 'thermo' | 'motor1' | 'motor2';
-export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd' | 'ultrasonic' | 'tmp36' | 'motor' | 'shield' | 'dcmotor' | 'dcmotor2' | 'battery';
+export type LessonId = 'blink' | 'button' | 'pot' | 'buzzer' | 'light' | 'servo' | 'fade' | 'sos' | 'doorbell' | 'toggle' | 'theremin' | 'servopot' | 'alarm' | 'sunflower' | 'reaction' | 'lcd' | 'distance' | 'thermo' | 'motor1' | 'motor2' | 'car';
+export type ComponentId = 'led' | 'resistor' | 'button' | 'pot' | 'wires' | 'buzzer' | 'ldr' | 'servo' | 'lcd' | 'ultrasonic' | 'tmp36' | 'motor' | 'shield' | 'dcmotor' | 'dcmotor2' | 'battery' | 'car';
 
 export interface ComponentPhoto {
   src: string;
@@ -195,6 +195,14 @@ export const COMPONENTS: Record<ComponentId, ComponentInfo> = {
       license: 'CC BY-SA 2.0',
       source: 'https://commons.wikimedia.org/wiki/File:Temperature_Sensor_(TMP36).jpg',
     },
+  },
+  car: {
+    name: { fr: 'Voiture robot (2 moteurs + HC-SR04)', ar: 'سيارة روبوت (محرّكان + HC-SR04)' },
+    role: {
+      fr: 'Deux moteurs M1 (gauche) et M2 (droite) pilotés par le Motor Shield : même sens = avancer ou reculer, sens opposés = tourner. Un HC-SR04 à l’avant mesure la distance aux obstacles.',
+      ar: 'محرّكان M1 (الأيسر) وM2 (الأيمن) يتحكم بهما درع المحرّكات: الاتجاه نفسه = تقدّم أو تراجع، والاتجاهان المتعاكسان = دوران. وحسّاس HC-SR04 في المقدمة يقيس المسافة إلى العوائق.',
+    },
+    color: '#e08a2e',
   },
   ultrasonic: {
     name: { fr: 'Capteur à ultrasons HC-SR04', ar: 'حسّاس الموجات فوق الصوتية HC-SR04' },
@@ -897,6 +905,39 @@ void loop() {
     },
     code: `// Leçon 20 — deux moteurs : un robot\n#include <AFMotor.h>\n\nAF_DCMotor gauche(1);\nAF_DCMotor droite(2);\n\nvoid avancer(int vitesse) {\n  gauche.setSpeed(vitesse);\n  droite.setSpeed(vitesse);\n  gauche.run(FORWARD);\n  droite.run(FORWARD);\n}\n\nvoid tourner(int vitesse) {\n  gauche.setSpeed(vitesse);\n  droite.setSpeed(vitesse);\n  gauche.run(FORWARD);\n  droite.run(BACKWARD);\n}\n\nvoid stopper() {\n  gauche.run(RELEASE);\n  droite.run(RELEASE);\n}\n\nvoid setup() {\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  Serial.println(\"Avance\");\n  avancer(200);\n  delay(2000);\n\n  Serial.println(\"Tourne\");\n  tourner(180);\n  delay(800);\n\n  stopper();\n  delay(1000);\n}\n`,
     components: ['shield', 'dcmotor', 'dcmotor2', 'battery', 'wires'],
+    highlightPins: [],
+  },
+  {
+    id: 'car',
+    title: { fr: 'Voiture anti-obstacles', ar: 'سيارة تتجنّب العوائق' },
+    tagline: {
+      fr: 'Le robot roule seul, mesure la distance avec le HC-SR04 et change de direction avant de toucher un mur.',
+      ar: 'الروبوت يسير وحده ويقيس المسافة بحسّاس HC-SR04 ويغيّر اتجاهه قبل أن يصطدم بحائط.',
+    },
+    duration: 25,
+    level: { fr: 'Projet', ar: 'مشروع' },
+    description: {
+      fr: 'On réunit les leçons 17 et 20 : le Motor Shield pilote les deux moteurs (M1 à gauche, M2 à droite) et le HC-SR04 mesure la distance devant le robot. Si un obstacle est à moins de 25 cm, le robot s’arrête, recule, puis tourne (à gauche ou à droite, au hasard) avant de repartir. Lancez le code et regardez la voiture dans l’arène.',
+      ar: 'نجمع بين الدرسين 17 و20: يقود درع المحرّكات المحرّكين (M1 على اليسار وM2 على اليمين) ويقيس HC-SR04 المسافة أمام الروبوت. إذا كان العائق على بعد أقل من 25 سم يتوقف الروبوت ويتراجع ثم يدور (يسارًا أو يمينًا عشوائيًا) قبل أن ينطلق من جديد. شغّل الكود وتابع السيارة في الساحة.',
+    },
+    objectives: {
+      fr: ['Combiner un capteur de distance et deux moteurs.', 'Écrire des fonctions avancer(), reculer(), tournerGauche(), tournerDroite() et stopper().', 'Décider avec if / else d’après la distance mesurée.'],
+      ar: ['الجمع بين حسّاس مسافة ومحرّكين.', 'كتابة دوال avancer() وreculer() وtournerGauche() وtournerDroite() وstopper().', 'اتخاذ القرار بـ if / else حسب المسافة المقاسة.'],
+    },
+    wiring: {
+      fr: ['Tout est monté sur le châssis : Uno + Motor Shield, 2 moteurs, pack de 4 piles AA et HC-SR04 à l’avant.', 'Moteur gauche → M1, moteur droit → M2.', 'Pack de piles → EXT_PWR (+ et −).', 'HC-SR04 : VCC → 5V, TRIG → A2, ECHO → A3, GND → GND.'],
+      ar: ['كل القطع مركّبة على الهيكل: Uno مع درع المحرّكات، ومحرّكان، وعلبة 4 بطاريات AA، وحسّاس HC-SR04 في المقدمة.', 'المحرّك الأيسر ← M1 والأيمن ← M2.', 'علبة البطاريات ← EXT_PWR ‏(+ و −).', 'HC-SR04: ‏VCC ← 5V، وTRIG ← A2، وECHO ← A3، وGND ← GND.'],
+    },
+    challenge: {
+      fr: 'Ralentissez le robot quand l’obstacle est entre 25 et 50 cm, et arrêtez-le complètement à moins de 10 cm.',
+      ar: 'أبطئ الروبوت عندما يكون العائق بين 25 و50 سم، وأوقفه تمامًا عند أقل من 10 سم.',
+    },
+    hint: {
+      fr: 'Lancez le code et suivez la voiture dans l’arène ; changez 25 par une autre distance et relancez.',
+      ar: 'شغّل الكود وتابع السيارة في الساحة؛ غيّر الرقم 25 إلى مسافة أخرى وأعد التشغيل.',
+    },
+    code: `// Leçon 21 — voiture anti-obstacles\n#include <AFMotor.h>\n\nAF_DCMotor gauche(1);\nAF_DCMotor droite(2);\n\nconst int TRIG = A2;\nconst int ECHO = A3;\n\nvoid rouler(int sensGauche, int sensDroite, int vitesse) {\n  gauche.setSpeed(vitesse);\n  droite.setSpeed(vitesse);\n  gauche.run(sensGauche);\n  droite.run(sensDroite);\n}\n\nvoid avancer(int v) {\n  rouler(FORWARD, FORWARD, v);\n}\n\nvoid reculer(int v) {\n  rouler(BACKWARD, BACKWARD, v);\n}\n\nvoid tournerGauche(int v) {\n  rouler(BACKWARD, FORWARD, v);\n}\n\nvoid tournerDroite(int v) {\n  rouler(FORWARD, BACKWARD, v);\n}\n\nvoid stopper() {\n  gauche.run(RELEASE);\n  droite.run(RELEASE);\n}\n\nint mesurer() {\n  digitalWrite(TRIG, LOW);\n  delayMicroseconds(2);\n  digitalWrite(TRIG, HIGH);\n  delayMicroseconds(10);\n  digitalWrite(TRIG, LOW);\n  return round(pulseIn(ECHO, HIGH) / 58.0);\n}\n\nvoid setup() {\n  pinMode(TRIG, OUTPUT);\n  pinMode(ECHO, INPUT);\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  int distance = mesurer();\n  Serial.println(distance);\n\n  if (distance > 0 && distance < 25) {\n    stopper();\n    delay(200);\n    reculer(150);\n    delay(400);\n    if (random(0, 2) == 0) {\n      tournerGauche(180);\n    } else {\n      tournerDroite(180);\n    }\n    delay(500);\n  } else {\n    avancer(170);\n  }\n\n  delay(50);\n}\n`,
+    components: ['car', 'shield', 'dcmotor', 'dcmotor2', 'battery', 'ultrasonic', 'wires'],
     highlightPins: [],
   },
 ];

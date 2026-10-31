@@ -1,7 +1,7 @@
 import type { Lang } from '../i18n';
 
 export type Kind = 'hat' | 'stmt' | 'num' | 'bool';
-export type CategoryId = 'pins' | 'control' | 'sound' | 'display' | 'sensing' | 'vars' | 'math';
+export type CategoryId = 'pins' | 'car' | 'control' | 'sound' | 'display' | 'sensing' | 'vars' | 'math';
 
 type Opt = [value: string, fr: string, ar: string];
 
@@ -35,6 +35,7 @@ export interface Workspace {
 
 export const CATEGORIES: { id: CategoryId; fr: string; ar: string; color: string }[] = [
   { id: 'pins', fr: 'Broches', ar: 'المنافذ', color: '#e2543f' },
+  { id: 'car', fr: 'Voiture', ar: 'السيارة', color: '#d9622b' },
   { id: 'control', fr: 'Contrôle', ar: 'التحكّم', color: '#e2a63c' },
   { id: 'sound', fr: 'Son', ar: 'الصوت', color: '#9a64d6' },
   { id: 'display', fr: 'Affichage', ar: 'العرض', color: '#0b7f8c' },
@@ -84,6 +85,10 @@ export const DEFS: Def[] = [
   { type: 'pwm', cat: 'pins', kind: 'stmt', parts: [T('luminosité broche', 'سطوع المنفذ'), SEL('pin', PWM, '9'), T('=', '='), N('v', '128')] },
   { type: 'servo', cat: 'pins', kind: 'stmt', parts: [T('servo broche', 'المحرّك المنفذ'), SEL('pin', DIGITAL, '10'), T('angle', 'الزاوية'), N('v', '90')] },
 
+  // -------------------------------------------------------------- voiture
+  { type: 'car_move', cat: 'car', kind: 'stmt', parts: [SEL('dir', [['fwd', 'avancer', 'تقدّم'], ['back', 'reculer', 'تراجع'], ['left', 'tourner à gauche', 'در يسارًا'], ['right', 'tourner à droite', 'در يمينًا']], 'fwd'), T('vitesse', 'السرعة'), N('v', '170')] },
+  { type: 'car_stop', cat: 'car', kind: 'stmt', parts: [T('arrêter la voiture', 'أوقف السيارة')] },
+  { type: 'car_turn_random', cat: 'car', kind: 'stmt', parts: [T('tourner au hasard, vitesse', 'در عشوائيًا، السرعة'), N('v', '180')] },
   // ------------------------------------------------------------- contrôle
   { type: 'wait', cat: 'control', kind: 'stmt', parts: [T('attendre', 'انتظر'), N('ms', '500'), T('ms', 'م.ث')] },
   { type: 'repeat', cat: 'control', kind: 'stmt', parts: [T('répéter', 'كرّر'), N('n', '10'), T('fois', 'مرّة'), C('body')] },

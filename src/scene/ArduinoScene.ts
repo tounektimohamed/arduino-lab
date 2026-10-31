@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { BoardEvent, BoardState } from '../sim/BoardState';
+import { ARENA, TOP_SPEED } from '../sim/car';
 import {
   BOARD,
   BREADBOARD,
@@ -120,6 +121,12 @@ export class ArduinoScene {
   private readonly ultraWires = new THREE.Group();
   private readonly ballGroup = new THREE.Group();
   private readonly pingRings: THREE.Mesh[] = [];
+  private readonly carGroup = new THREE.Group();
+  private readonly arenaGroup = new THREE.Group();
+  private carPingRing!: THREE.Mesh;
+  private readonly carRig = new THREE.Group();
+  private readonly carSpin: THREE.Group[] = [];
+  private labObjects: THREE.Object3D[] = [];
   private distanceCm = 30;
   private pingUntil = 0;
   private lastTime = 0;
@@ -207,8 +214,10 @@ export class ArduinoScene {
     this.buildEnvironment();
     this.buildLights();
     this.buildDesk();
-    this.buildBoard();
-    this.buildBreadboard();
+    this.labObjects = this.collect(() => {
+      this.buildBoard();
+      this.buildBreadboard();
+    });
     this.buildComponents();
     this.buildWires();
     this.buildHighlights();
@@ -220,6 +229,13 @@ export class ArduinoScene {
 
     this.setPotVisual(board.potValue);
     this.renderer.setAnimationLoop(() => this.frame());
+  }
+
+  /** Renvoie les objets ajoutés à la scène pendant `build` (pour pouvoir les masquer ensuite). */
+  private collect(build: () => void): THREE.Object3D[] {
+    const before = new Set(this.scene.children);
+    build();
+    return this.scene.children.filter((child: THREE.Object3D) => !before.has(child));
   }
 
   setLesson(pins: string[], components: string[]): void {
@@ -248,10 +264,35 @@ export class ArduinoScene {
     });
     this.tmpWires.visible = has('tmp36');
     this.ballGroup.visible = has('ultrasonic');
+    const car = has('car');
+    this.carGroup.visible = car;
+    this.arenaGroup.visible = car;
+    for (const object of this.labObjects) object.visible = !car;
+    if (car) {
+      // La voiture embarque sa propre carte, son shield, sa batterie, ses moteurs et son capteur.
+      this.shieldGroup.visible = false;
+      this.batteryGroup.visible = false;
+      this.batteryWires.visible = false;
+      this.ultraGroup.visible = false;
+      this.ultraWires.visible = false;
+      this.ballGroup.visible = false;
+      this.motorRigs.forEach((rig) => {
+        rig.group.visible = false;
+        rig.wires.visible = false;
+      });
+    }
+    this.controls.maxDistance = car ? 48 : 30;
+    const fog = this.scene.fog as THREE.Fog;
+    fog.near = car ? 48 : 30;
+    fog.far = car ? 90 : 56;
     const nextTarget = this.viewTarget();
-    this.camera.position.add(nextTarget.clone().sub(this.controls.target));
-    this.controls.target.copy(nextTarget);
-    this.controls.update();
+    if (car) {
+      this.resetView();
+    } else {
+      this.camera.position.add(nextTarget.clone().sub(this.controls.target));
+      this.controls.target.copy(nextTarget);
+      this.controls.update();
+    }
     this.buttonGroup.visible = has('button');
     this.buttonWires.visible = has('button');
     this.potGroup.visible = has('pot');
@@ -271,11 +312,13 @@ export class ArduinoScene {
   resetView(): void {
     const target = this.viewTarget();
     this.controls.target.copy(target);
-    this.camera.position.copy(target).add(vec(11.2, 10.15, 13.25));
+    const zoom = this.activeComponents.includes('car') ? 1.75 : 1;
+    this.camera.position.copy(target).add(vec(11.2 * zoom, 10.15 * zoom, 13.25 * zoom));
     this.controls.update();
   }
 
   private viewTarget(): THREE.Vector3 {
+    if (this.activeComponents.includes('car')) return vec(0, 0.35, 13);
     const near = ['servo', 'lcd', 'ultrasonic', 'shield'].some((name) => this.activeComponents.includes(name));
     return vec(0.3, 0.35, near ? 1.6 : 0.25);
   }
@@ -346,9 +389,14 @@ export class ArduinoScene {
   }
 
   private buildBoard(): void {
-    const group = new THREE.Group();
+    const group = this.makeBoard();
     group.position.set(BOARD.x, BOARD.y, BOARD.z);
     this.scene.add(group);
+  }
+
+  /** Carte Arduino Uno (centrée sur l'origine du groupe) ; réutilisée sur la voiture. */
+  private makeBoard(): THREE.Group {
+    const group = new THREE.Group();
 
     const pcb = new THREE.Mesh(
       new RoundedBoxGeometry(BOARD.w, BOARD.h, BOARD.d, 3, 0.06),
@@ -560,6 +608,7 @@ export class ArduinoScene {
       group.add(smd);
       this.registerPart(smd, 'smd');
     }
+    return group;
   }
 
   private registerPart(object: THREE.Object3D, key: string): void {
@@ -732,6 +781,8 @@ export class ArduinoScene {
     this.buildShield();
     this.buildMotors();
     this.buildBattery();
+    this.buildArena();
+    this.buildCar();
   }
 
   private buildLed(): void {
@@ -1299,6 +1350,282 @@ export class ArduinoScene {
     this.scene.add(this.ultraWires);
   }
 
+  /** Piste rectangulaire entourée de murs, avec quelques obstacles colorés (1 unité = 4 cm). */
+  private buildArena(): void {
+    const w = ARENA.maxX - ARENA.minX;
+    const d = ARENA.maxZ - ARENA.minZ;
+    const cx = (ARENA.minX + ARENA.maxX) / 2;
+    const cz = (ARENA.minZ + ARENA.maxZ) / 2;
+
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, d), std(0xd9d2c2, { roughness: 0.9 }));
+    floor.position.set(cx, 0.02, cz);
+    floor.receiveShadow = true;
+    this.arenaGroup.add(floor);
+
+    const wallMat = std(0x4c5a68, { roughness: 0.7 });
+    const wall = (x: number, z: number, ww: number, dd: number): void => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(ww, 2.2, dd), wallMat);
+      m.position.set(x, 1.1, z);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      this.arenaGroup.add(m);
+    };
+    const t = 0.5;
+    wall(cx, ARENA.minZ - t / 2, w + 2 * t, t);
+    wall(cx, ARENA.maxZ + t / 2, w + 2 * t, t);
+    wall(ARENA.minX - t / 2, cz, t, d);
+    wall(ARENA.maxX + t / 2, cz, t, d);
+
+    for (const o of ARENA.obstacles) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(o.w, 2, o.d), std(o.color, { roughness: 0.6 }));
+      m.position.set(o.x, 1.05, o.z);
+      m.castShadow = true;
+      this.arenaGroup.add(m);
+    }
+
+    this.arenaGroup.visible = false;
+    this.scene.add(this.arenaGroup);
+  }
+
+  /**
+   * Voiture robot complète, construite à l'échelle réelle en centimètres puis réduite (×0,25) :
+   * châssis, 2 moteurs jaunes + roues, roulette, Arduino Uno + Motor Shield, pack de 4 piles AA,
+   * capteur HC-SR04 à l'avant, et tous les fils (moteurs → M1/M2, piles → EXT_PWR, capteur → 5V/GND/A2/A3).
+   * L'avant de la voiture est vers -z.
+   */
+  private buildCar(): void {
+    const rig = this.carRig; // 1 unité = 1 cm
+    rig.scale.setScalar(0.25);
+    this.carGroup.add(rig);
+
+    const yellow = std(0xf2c230, { roughness: 0.5 });
+    const silver = std(0xb9bdc4, { metalness: 0.7, roughness: 0.35 });
+    const dark = std(0x1a1a1d, { roughness: 0.85 });
+    const gold = std(0xd4af37, { metalness: 0.8, roughness: 0.3 });
+    const WIRE = 0.14;
+
+    // ---- châssis : plaque en acrylique
+    const plate = new THREE.Mesh(
+      new RoundedBoxGeometry(13.5, 0.5, 21, 2, 0.15),
+      std(0x9fb4c8, { roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.88 }),
+    );
+    plate.position.set(0, 4.7, 0);
+    plate.castShadow = true;
+    plate.receiveShadow = true;
+    rig.add(plate);
+    this.registerPart(plate, 'car');
+
+    // ---- moteurs + roues (gauche = M1, droite = M2)
+    const motorTabs: THREE.Vector3[][] = [];
+    this.carSpin.length = 0;
+    for (const side of [-1, 1]) {
+      const motor = new THREE.Group();
+      motor.position.set(0, 3.25, 3);
+
+      const gearbox = new THREE.Mesh(new RoundedBoxGeometry(5.2, 2.3, 2.3, 2, 0.15), yellow);
+      gearbox.position.x = side * 5.1;
+      gearbox.castShadow = true;
+      motor.add(gearbox);
+
+      const can = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 2.6, 20), silver);
+      can.rotation.z = Math.PI / 2;
+      can.position.x = side * 1.45;
+      can.castShadow = true;
+      motor.add(can);
+
+      for (const dy of [0.4, -0.4]) {
+        const tab = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.12), gold);
+        tab.position.set(side * 0.08, dy, 0);
+        motor.add(tab);
+      }
+      motorTabs.push([vec(side * 0.15, 3.25 + 0.4, 3), vec(side * 0.15, 3.25 - 0.4, 3)]);
+
+      const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.6, 12), silver);
+      axle.rotation.z = Math.PI / 2;
+      axle.position.x = side * 8.2;
+      motor.add(axle);
+
+      const wheel = new THREE.Group();
+      wheel.position.x = side * 9.1;
+      const spin = new THREE.Group();
+      const tire = new THREE.Mesh(new THREE.CylinderGeometry(3.25, 3.25, 2.6, 32), dark);
+      tire.rotation.z = Math.PI / 2;
+      tire.castShadow = true;
+      spin.add(tire);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 2.7, 24), std(0xe8e4da));
+      hub.rotation.z = Math.PI / 2;
+      spin.add(hub);
+      for (let i = 0; i < 3; i++) {
+        const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.2, 5.6, 0.45), std(0xb3402f));
+        spoke.position.x = side * 1.36;
+        spoke.rotation.x = (i * Math.PI) / 3;
+        spin.add(spoke);
+      }
+      const marker = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 0.7), std(0xd0453a));
+      marker.position.set(side * 1.4, 2.5, 0);
+      spin.add(marker);
+      wheel.add(spin);
+      motor.add(wheel);
+      this.carSpin.push(spin);
+
+      this.registerPart(motor, 'dcmotor');
+      rig.add(motor);
+    }
+
+    // ---- roulette avant
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.8, 12), silver);
+    post.position.set(0, 3.3, -7.5);
+    rig.add(post);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(1.0, 16, 12), silver);
+    ball.position.set(0, 1.0, -7.5);
+    ball.castShadow = true;
+    rig.add(ball);
+
+    // ---- Arduino Uno + Motor Shield (empilés, tournés de 90° : bornes vers la droite, USB vers l'arrière)
+    const stack = new THREE.Group();
+    stack.position.set(0, 5.95, -1.5);
+    stack.rotation.y = Math.PI / 2;
+    stack.updateMatrix();
+
+    const keep = { on: this.onboardMaterial, tx: this.txMaterial };
+    const uno = this.makeBoard();
+    this.onboardMaterial = keep.on; // le bureau garde ses propres LED animées
+    this.txMaterial = keep.tx;
+    stack.add(uno);
+
+    const shield = new THREE.Group();
+    shield.position.y = 0.54;
+    this.fillShield(shield);
+    stack.add(shield);
+
+    // connecteurs pour le capteur : A2/A3 et 5V/GND
+    const headerMat = std(0x171717, { roughness: 0.8 });
+    const strip = (x: number, z: number, width: number, text: string): void => {
+      const mesh = new THREE.Mesh(new RoundedBoxGeometry(width, 0.22, 0.24, 2, 0.03), headerMat);
+      mesh.position.set(x, 0.15, z);
+      shield.add(mesh);
+      const label = textPlane(text, 0.9);
+      label.position.set(x, 0.05, z - 0.3);
+      shield.add(label);
+    };
+    strip(-2.1, 2.28, 0.74, 'A2 A3');
+    strip(1.22, 1.5, 0.74, '5V GND');
+    rig.add(stack);
+
+    // vis des bornes dans le repère de la voiture
+    const toRig = (x: number, y: number, z: number): THREE.Vector3 => vec(x, y, z).applyMatrix4(stack.matrix);
+    const screwY = 0.54 + 0.5;
+    const m1 = [toRig(-1.6, screwY, 2.2), toRig(-1.2, screwY, 2.2)];
+    const m2 = [toRig(-0.6, screwY, 2.2), toRig(-0.2, screwY, 2.2)];
+    const ext = [toRig(2.6, screwY, 2.2), toRig(3.0, screwY, 2.2)]; // [-, +]
+    const pinTop = 0.54 + 0.32;
+    const pA2 = toRig(-2.26, pinTop, 2.28);
+    const pA3 = toRig(-1.94, pinTop, 2.28);
+    const p5V = toRig(1.06, pinTop, 1.5);
+    const pGND = toRig(1.38, pinTop, 1.5);
+
+    // standoffs sous la carte
+    for (const sx of [-2.2, 2.2]) {
+      for (const sz of [-4.2, 1.2]) {
+        const post2 = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.95, 10), gold);
+        post2.position.set(sx, 5.4, sz);
+        rig.add(post2);
+      }
+    }
+
+    // ---- pack de 4 piles AA
+    const battery = new THREE.Group();
+    battery.position.set(0, 4.95, 6.2);
+    const holder = new THREE.Mesh(new RoundedBoxGeometry(5.8, 2.0, 6.2, 2, 0.15), std(0x2a2d33, { roughness: 0.6 }));
+    holder.position.y = 1.0;
+    holder.castShadow = true;
+    battery.add(holder);
+    const batteryText = textPlane('4×AA 6V', 3.4);
+    batteryText.position.set(0, 2.03, 0);
+    battery.add(batteryText);
+    const nub = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.5), gold);
+    nub.position.set(2.2, 2.1, -2.4);
+    battery.add(nub);
+    this.registerPart(battery, 'battery');
+    rig.add(battery);
+    const batteryOut = [vec(1.4, 5.7, 3.1), vec(2.2, 5.7, 3.1)]; // [-, +]
+
+    // ---- capteur HC-SR04 à l'avant
+    const sensor = new THREE.Group();
+    sensor.position.set(0, 6.6, -10.0);
+    const bracket = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.3, 1.6), dark);
+    bracket.position.set(0, -1.5, 0.5);
+    sensor.add(bracket);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.0, 0.2), std(0x1e4fa0, { roughness: 0.55 }));
+    board.castShadow = true;
+    sensor.add(board);
+    for (const x of [-1.15, 1.15]) {
+      const eye = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.9, 24), silver);
+      eye.rotation.x = Math.PI / 2;
+      eye.position.set(x, 0, -0.5);
+      eye.castShadow = true;
+      sensor.add(eye);
+      const face = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.04, 24), std(0x15171a, { roughness: 0.7 }));
+      face.rotation.x = Math.PI / 2;
+      face.position.set(x, 0, -0.97);
+      sensor.add(face);
+    }
+    const crystal = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.3), silver);
+    crystal.position.set(0, 0.1, -0.2);
+    sensor.add(crystal);
+    const sensorPins = [-0.75, -0.25, 0.25, 0.75];
+    for (const x of sensorPins) {
+      const pin = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.9), gold);
+      pin.position.set(x, -0.8, 0.5);
+      sensor.add(pin);
+    }
+    this.registerPart(sensor, 'ultrasonic');
+    rig.add(sensor);
+    const sp = (i: number): THREE.Vector3 => vec(sensorPins[i], 6.6 - 0.8, -10.0 + 1.0);
+
+    // ---- fils
+    const wires = new THREE.Group();
+    const wire = (path: THREE.Vector3[], color: number): void => {
+      wires.add(wireMesh(path, color, WIRE));
+    };
+    // moteurs → M1 (gauche) et M2 (droite) : rouge / noir
+    wire(archPoints(motorTabs[0][0], m1[0], 2.2), COLORS.red);
+    wire(archPoints(motorTabs[0][1], m1[1], 1.6), COLORS.black);
+    wire(archPoints(motorTabs[1][0], m2[0], 2.2), COLORS.red);
+    wire(archPoints(motorTabs[1][1], m2[1], 1.6), COLORS.black);
+    // pack de piles → EXT_PWR
+    wire(archPoints(batteryOut[1], ext[1], 1.4), COLORS.red);
+    wire(archPoints(batteryOut[0], ext[0], 1.0), COLORS.black);
+    // capteur → 5V, A2 (TRIG), A3 (ECHO), GND
+    wire(archPoints(sp(0), p5V, 2.4), COLORS.red);
+    wire(archPoints(sp(1), pA2, 3.0), COLORS.green);
+    wire(archPoints(sp(2), pA3, 3.5), COLORS.orange);
+    wire(archPoints(sp(3), pGND, 2.0), COLORS.black);
+    rig.add(wires);
+
+    // ---- onde ultrasonore devant le capteur
+    this.carPingRing = new THREE.Mesh(
+      new THREE.TorusGeometry(1.6, 0.1, 8, 32),
+      new THREE.MeshBasicMaterial({ color: 0x6ad0ff, transparent: true, opacity: 0, depthWrite: false }),
+    );
+    this.carPingRing.position.set(0, 6.6, -11.4);
+    rig.add(this.carPingRing);
+
+    this.carGroup.visible = false;
+    this.scene.add(this.carGroup);
+    this.updateCarVisual(0);
+  }
+
+  private updateCarVisual(delta: number): void {
+    const car = this.board.car;
+    this.carGroup.position.set(car.x, 0.07, car.z);
+    this.carGroup.rotation.y = -car.heading;
+    // ω = v / r : rayon de roue = 3,25 cm = 0,8125 unité (1 unité = 4 cm)
+    const radius = 3.25 / 4;
+    this.carSpin[0].rotation.x -= ((car.left * TOP_SPEED) / radius) * delta;
+    this.carSpin[1].rotation.x -= ((car.right * TOP_SPEED) / radius) * delta;
+  }
+
   /** La balle est à `cm` centimètres de la face avant du capteur (0,08 unité par cm). */
   private setDistanceVisual(cm: number): void {
     this.distanceCm = cm;
@@ -1364,6 +1691,13 @@ export class ArduinoScene {
   private buildShield(): void {
     const group = this.shieldGroup;
     group.position.set(BOARD.x, 0.62, BOARD.z);
+    this.fillShield(group);
+    group.visible = false;
+    this.scene.add(group);
+  }
+
+  /** Remplit un groupe avec le Motor Shield L293D (utilisé sur le bureau et sur la voiture). */
+  private fillShield(group: THREE.Group): void {
 
     const pcb = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.08, 5.34), std(0x1d2b4a, { roughness: 0.55 }));
     pcb.position.x = 0.43;
@@ -1410,9 +1744,6 @@ export class ArduinoScene {
     terminal(0.6, 0x1f6fb8, 'terminals', 'M3');
     terminal(1.6, 0x1f6fb8, 'terminals', 'M4');
     terminal(2.8, 0x2e7d32, 'extpwr', 'EXT_PWR');
-
-    group.visible = false;
-    this.scene.add(group);
   }
 
   /** Deux moteurs jaunes à réducteur, roue visible : la roue tourne selon le sens et la vitesse. */
@@ -1932,6 +2263,20 @@ export class ArduinoScene {
     });
 
     for (const rig of this.motorRigs) rig.wheel.rotation.z -= rig.omega * delta;
+
+    if (this.carGroup.visible) {
+      this.board.stepCar(delta);
+      this.updateCarVisual(delta);
+      const material = this.carPingRing.material as THREE.MeshBasicMaterial;
+      if (time < this.pingUntil) {
+        const phase = (time * 3) % 1;
+        this.carPingRing.position.z = -11.4 - phase * 22;
+        this.carPingRing.scale.setScalar(1 + phase * 2.2);
+        material.opacity = (1 - phase) * 0.7;
+      } else {
+        material.opacity = 0;
+      }
+    }
 
     const pinging = time < this.pingUntil;
     const travel = this.distanceCm * 0.08;

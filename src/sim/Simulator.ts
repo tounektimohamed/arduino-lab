@@ -29,6 +29,7 @@ export class Simulator {
     const startedAt = performance.now();
     this.runningFlag = true;
     this.board.reset();
+    this.board.programRunning = true;
     this.emit();
 
     const runtime = this.createRuntime(token, startedAt);
@@ -45,6 +46,7 @@ export class Simulator {
     } finally {
       if (token === this.token) {
         this.runningFlag = false;
+        this.board.programRunning = false;
         this.emit();
       }
     }
@@ -52,6 +54,7 @@ export class Simulator {
 
   stop(): void {
     this.token++;
+    this.board.programRunning = false;
     if (this.runningFlag) {
       this.runningFlag = false;
       this.emit();

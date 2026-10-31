@@ -7,6 +7,7 @@ interface Ctx {
   serial: boolean;
   loops: number;
   ultra: { trig: string; echo: string } | null;
+  car: boolean;
 }
 
 const LOOP_NAMES = ['i', 'j', 'k', 'l', 'm'];
@@ -77,6 +78,15 @@ function expr(b: Block, ctx: Ctx): string {
   }
 }
 
+function carDrive(ind: string, speed: string, left: string, right: string): string[] {
+  return [
+    `${ind}gauche.setSpeed(${speed});`,
+    `${ind}droite.setSpeed(${speed});`,
+    `${ind}gauche.run(${left});`,
+    `${ind}droite.run(${right});`,
+  ];
+}
+
 function body(list: Block[], ctx: Ctx, ind: string): string[] {
   const out: string[] = [];
   for (const b of list) out.push(...stmt(b, ctx, ind));
@@ -144,6 +154,27 @@ function stmt(b: Block, ctx: Ctx, ind: string): string[] {
         `${ind}${name} = round(pulseIn(${echo}, HIGH) / 58.0);`,
       ];
     }
+    case 'car_move': {
+      ctx.car = true;
+      const dir = sel(b, 'dir');
+      const left = dir === 'fwd' || dir === 'right' ? 'FORWARD' : 'BACKWARD';
+      const right = dir === 'fwd' || dir === 'left' ? 'FORWARD' : 'BACKWARD';
+      return carDrive(ind, val(b, 'v', ctx), left, right);
+    }
+    case 'car_stop':
+      ctx.car = true;
+      return [`${ind}gauche.run(RELEASE);`, `${ind}droite.run(RELEASE);`];
+    case 'car_turn_random': {
+      ctx.car = true;
+      const v = val(b, 'v', ctx);
+      return [
+        `${ind}if (random(0, 2) == 0) {`,
+        ...carDrive(`${ind}  `, v, 'BACKWARD', 'FORWARD'),
+        `${ind}} else {`,
+        ...carDrive(`${ind}  `, v, 'FORWARD', 'BACKWARD'),
+        `${ind}}`,
+      ];
+    }
     case 'print':
       ctx.serial = true;
       return [`${ind}Serial.print("${text(b.vals.text)}");`];
@@ -187,16 +218,18 @@ function stmt(b: Block, ctx: Ctx, ind: string): string[] {
 
 /** Transforme l'espace de travail en code Arduino (C++) exécutable par le simulateur. */
 export function generateCode(ws: Workspace): string {
-  const ctx: Ctx = { vars: new Set(), servoPin: null, lcd: false, serial: false, loops: 0, ultra: null };
+  const ctx: Ctx = { vars: new Set(), servoPin: null, lcd: false, serial: false, loops: 0, ultra: null, car: false };
   const setupBody = body(ws.setup, ctx, '  ');
   ctx.loops = 0;
   const loopBody = body(ws.loop, ctx, '  ');
 
   const head: string[] = ['// Programme généré par les blocs'];
   if (ctx.servoPin !== null) head.push('#include <Servo.h>');
+  if (ctx.car) head.push('#include <AFMotor.h>');
   if (ctx.lcd) head.push('#include <Wire.h>', '#include <LiquidCrystal_I2C.h>');
   head.push('');
   if (ctx.servoPin !== null) head.push('Servo bras;');
+  if (ctx.car) head.push('AF_DCMotor gauche(1);', 'AF_DCMotor droite(2);');
   if (ctx.lcd) head.push('LiquidCrystal_I2C lcd(0x27, 16, 2);');
   for (const name of ctx.vars) head.push(`int ${name} = 0;`);
   if (head[head.length - 1] !== '') head.push('');
